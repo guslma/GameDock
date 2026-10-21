@@ -229,8 +229,10 @@ class Template(HTMLParser):
         raw = self.get_starttag_text() or ""
         for name, value in attrs:
             if name in ATTRIBUTES and value and is_text(value):
-                at = raw.find(value)
-                if at >= 0:
+                # The value of this attribute, not the same text elsewhere in the tag (an id, a class)
+                match = re.search(r"\b%s\s*=\s*([\"'])%s\1" % (re.escape(name), re.escape(value)), raw)
+                if match:
+                    at = match.start(1) + 1
                     self.attrs.append((start + at, start + at + len(value), value))
         if tag in ("script", "style"):
             self.in_raw = (tag, start + len(raw))
