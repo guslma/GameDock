@@ -163,11 +163,18 @@ LOGIC_USE = re.compile(r"""(?:===?|!==?|\bcase)\s*(['"`])(.*?)\1|(?:(?<=[{,])|(?
 LOGIC_STRINGS = set()
 
 
+# Strings handed to string functions are matched against other text, not shown:
+# html.replace(' checked', '') only works while ' checked' keeps its value
+METHOD_ARGUMENT = re.compile(r"""\.(?:replace|replaceAll|includes|indexOf|lastIndexOf|startsWith|endsWith|split|match|search)\(\s*(['"`])(.*?)\1""")
+
+
 def logic_strings(source):
     found = set()
     for match in LOGIC_USE.finditer(source):
         value = next(g for g in (match.group(2), match.group(4), match.group(6)) if g is not None)
-        found.add(value.strip())
+        found.update({value, value.strip()})
+    for match in METHOD_ARGUMENT.finditer(source):
+        found.update({match.group(2), match.group(2).strip()})
     return found
 
 
