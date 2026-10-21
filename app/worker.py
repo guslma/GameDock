@@ -165,6 +165,10 @@ def start_worker_process(stop_event, worker_id=1):
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
+    import gamedock_system
+    gamedock_system.log_to_file(logging.Formatter(
+        f'[%(asctime)s.%(msecs)03d] %(levelname)s (%(module)s) worker-{worker_id} %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'))
 
     app = create_app()
     worker = TaskWorker(app, poll_interval=2.0, stop_event=stop_event, worker_id=worker_id)

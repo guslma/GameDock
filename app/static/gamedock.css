@@ -263,3 +263,15 @@ code { color: #C9C0FF; }
     border-radius: 999px; padding: 4px 8px 4px 12px; font-size: .85rem;
 }
 .gd-chip:hover { border-color: var(--gd-brand-1); color: #fff; }
+
+/* ---- Settings > Logs ---- */
+.gd-log {
+    background: #0B0D10; border: 1px solid var(--gd-border); border-radius: 10px;
+    height: 60vh; min-height: 320px; overflow: auto; padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; line-height: 1.5;
+}
+.gd-log-line { white-space: pre-wrap; word-break: break-word; color: #C9CED6; }
+.gd-log-debug { color: #8A95A5; }
+.gd-log-warning { color: var(--gd-warn); }
+.gd-log-error, .gd-log-critical { color: #F28B8B; }
+.gd-log-empty { color: var(--gd-muted); font-family: var(--bs-body-font-family); }

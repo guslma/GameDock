@@ -15,7 +15,7 @@ Ele nasceu do [Ownfoil](https://github.com/a1ex4/ownfoil), segue com código e i
 - **Telas reorganizadas:** no menu, **Biblioteca**, **Conectar o console** e **Admin**. No Admin, só três itens:
   - **Visão geral:** os números da biblioteca, o que está rodando agora, os próximos agendamentos e avisos do que precisa de atenção.
   - **Arquivos:** todos os arquivos, com filtros e ações (verificar, comprimir, identificar de novo, excluir).
-  - **Configurações**, em abas: Loja, Biblioteca, Usuários, Manutenção automática e Avançado, com um botão Salvar por aba e textos em linguagem simples.
+  - **Configurações**, em abas: Loja, Biblioteca, Usuários, Manutenção automática, Avançado e Logs, com um botão Salvar por aba e textos em linguagem simples. Em Logs dá para ver o registro do app, filtrar só avisos e erros, buscar e baixar.
 - **Conectar o console:** os endereços de casa e de fora de casa com botão de copiar, e os passos do Sphaira, do Tinfoil e do CyberFoil lado a lado.
 - **Idiomas:** português, inglês e espanhol. Cada pessoa vê o idioma do próprio navegador e pode trocar pelo menu.
 - **Biblioteca:** visualização em cartões, capas ou lista, e uma barra com busca, um menu de filtros (jogos ou DLC, o que tenho ou não, atualização, DLC) e um menu de exibição (itens por página e tamanho dos cartões).
@@ -32,6 +32,7 @@ sudo docker run -d --name gamedock \
   -p 8465:8465 \
   -e USER_ADMIN_NAME=admin \
   -e USER_ADMIN_PASSWORD=troque-esta-senha \
+  -e TZ=America/Sao_Paulo \
   -v /caminho/dos/jogos:/games \
   -v ~/gamedock/config:/app/config \
   -v ~/gamedock/data:/app/data \
@@ -41,6 +42,7 @@ sudo docker run -d --name gamedock \
 
 Depois, abra `http://IP-DA-MÁQUINA:8465` no navegador. A imagem funciona em computadores comuns (amd64) e em ARM (arm64 e armv7).
 
+- `TZ` é o fuso horário, usado nos registros (**Admin → Configurações → Logs**) e nos agendamentos. Sem ele, o GameDock usa UTC. Em vez de escrever o fuso, dá para usar o da própria máquina com `-v /etc/localtime:/etc/localtime:ro`.
 - O usuário de `USER_ADMIN_NAME` e `USER_ADMIN_PASSWORD` é recriado a cada início do contêiner. Para mudar a senha dele, mude a variável. Os outros usuários são criados e editados em **Admin → Configurações → Usuários**.
 - Para o console achar o servidor sozinho na rede (opção **Encontrar na rede de casa**), o contêiner precisa da rede do host: `--network host` no lugar de `-p 8465:8465`, ou `network_mode: host` no Compose. Sem isso, basta digitar o endereço no console.
 
@@ -56,6 +58,8 @@ services:
     environment:
       USER_ADMIN_NAME: admin
       USER_ADMIN_PASSWORD: troque-esta-senha
+      # Fuso horário dos registros e agendamentos (lista: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+      TZ: America/Sao_Paulo
       # Idioma para quem não escolheu nenhum e usa um navegador num idioma sem tradução
       GAMEDOCK_LANGUAGE: pt-BR
     volumes:

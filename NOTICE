@@ -17,8 +17,8 @@ starting in October 2026:
 - Reorganized screens: Overview (former Stats and Tasks pages), Settings in
   tabs (with the former Services page), "Connect your console" (former Setup
   page) and a library toolbar with filter menus.
-- List view of the library, editing of users (app/gamedock_users.py) and an
-  About dialog.
+- List view of the library, editing of users (app/gamedock_users.py), an About
+  dialog and a Logs tab in Settings (app/gamedock_system.py).
 - Fixes: the console address shown inside Docker bridge networks, and the
   Settings page on a fresh install before the catalogue is downloaded.
 

@@ -25,6 +25,7 @@
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-users" data-bs-toggle="tab" data-bs-target="#pane-users" type="button" role="tab" aria-controls="pane-users" aria-selected="false" data-hash="users">Users</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-maintenance" data-bs-toggle="tab" data-bs-target="#pane-maintenance" type="button" role="tab" aria-controls="pane-maintenance" aria-selected="false" data-hash="maintenance">Automatic maintenance</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-advanced" data-bs-toggle="tab" data-bs-target="#pane-advanced" type="button" role="tab" aria-controls="pane-advanced" aria-selected="false" data-hash="advanced">Advanced</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-logs" data-bs-toggle="tab" data-bs-target="#pane-logs" type="button" role="tab" aria-controls="pane-logs" aria-selected="false" data-hash="logs">Logs</button></li>
                 </ul>
 
                 <div class="tab-content">
@@ -533,11 +534,96 @@
                     </div>
                 </div>
 
+
+                <!-- ===================== LOGS ===================== -->
+                <div class="tab-pane fade" id="pane-logs" role="tabpanel" aria-labelledby="tab-logs" tabindex="0">
+                    <section class="gd-card">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <div class="btn-group gd-seg" role="group" aria-label="Log level" style="width: auto">
+                                <input type="radio" class="btn-check" name="logLevel" id="logLevelAll" value="all" checked>
+                                <label class="btn btn-outline-primary btn-sm" for="logLevelAll">Everything</label>
+                                <input type="radio" class="btn-check" name="logLevel" id="logLevelWarning" value="warning">
+                                <label class="btn btn-outline-primary btn-sm" for="logLevelWarning">Warnings and errors</label>
+                                <input type="radio" class="btn-check" name="logLevel" id="logLevelError" value="error">
+                                <label class="btn btn-outline-primary btn-sm" for="logLevelError">Errors</label>
+                            </div>
+                            <label class="gd-search" style="height: 34px; width: 220px">
+                                <i class="bi bi-search" aria-hidden="true"></i>
+                                <span class="visually-hidden">Search the log</span>
+                                <input type="text" id="logSearch" placeholder="Search the log">
+                            </label>
+                            <div class="form-check form-switch m-0 ms-md-auto">
+                                <input type="checkbox" class="form-check-input" id="logFollow" checked>
+                                <label class="form-check-label ms-1" for="logFollow">Update by itself</label>
+                            </div>
+                            <a class="btn btn-outline-secondary btn-sm" href="/api/logs/download"><i class="bi bi-download" aria-hidden="true"></i> Download</a>
+                        </div>
+                        <p class="form-text mt-0 mb-2"><span>Time zone</span>: <span id="logTimezone">…</span> · <span>server time</span>: <span id="logNow">…</span>. <span>It comes from the TZ variable of the installation.</span></p>
+                        <div id="logBox" class="gd-log" role="log" aria-live="off"></div>
+                    </section>
+                </div>
+
                 </div>
             </div>
 {% endblock %}
 
 {% block panel_scripts %}
+<script>
+    // Settings > Logs: the newest lines of the shared log file
+    const logBox = document.getElementById('logBox');
+    let logTimer = null;
+
+    async function loadLogs() {
+        const level = document.querySelector('input[name="logLevel"]:checked').value;
+        const search = document.getElementById('logSearch').value.trim();
+        const params = new URLSearchParams({lines: 800, level, search});
+        let data;
+        try {
+            data = await (await fetch('/api/logs?' + params, {credentials: 'same-origin'})).json();
+        } catch (e) {
+            return;
+        }
+        document.getElementById('logTimezone').textContent = data.timezone;
+        document.getElementById('logNow').textContent = data.now;
+        const atBottom = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 40;
+        logBox.innerHTML = '';
+        if (!data.lines.length) {
+            const empty = document.createElement('div');
+            empty.className = 'gd-log-empty';
+            empty.textContent = 'Nothing in the log yet.';
+            logBox.append(empty);
+        }
+        let level_ = '';
+        data.lines.forEach(text => {
+            const match = text.match(/^\[[^\]]+\] (\w+) /);
+            if (match) level_ = match[1];
+            const row = document.createElement('div');
+            row.className = 'gd-log-line gd-log-' + (level_ || 'INFO').toLowerCase();
+            row.textContent = text;
+            logBox.append(row);
+        });
+        if (atBottom || !logBox.dataset.loaded) logBox.scrollTop = logBox.scrollHeight;
+        logBox.dataset.loaded = '1';
+    }
+
+    function followLogs() {
+        clearInterval(logTimer);
+        const open = document.getElementById('pane-logs').classList.contains('active');
+        if (open && document.getElementById('logFollow').checked) logTimer = setInterval(loadLogs, 5000);
+    }
+
+    document.getElementById('tab-logs').addEventListener('shown.bs.tab', () => { loadLogs(); followLogs(); });
+    document.querySelectorAll('#settingsTabs [data-bs-toggle="tab"]').forEach(button =>
+        button.addEventListener('hidden.bs.tab', followLogs));
+    document.querySelectorAll('input[name="logLevel"]').forEach(r => r.addEventListener('change', loadLogs));
+    document.getElementById('logFollow').addEventListener('change', followLogs);
+    let logSearchDelay;
+    document.getElementById('logSearch').addEventListener('input', () => {
+        clearTimeout(logSearchDelay);
+        logSearchDelay = setTimeout(loadLogs, 300);
+    });
+    if (document.getElementById('pane-logs').classList.contains('active')) { loadLogs(); followLogs(); }
+</script>
 <script>
     // Tabs: the address keeps the open tab (#shop, #library...), so a reload or a link
     // like /admin/settings#shopHostInput opens the right one

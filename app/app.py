@@ -66,6 +66,10 @@ logging.basicConfig(
     handlers=[handler]
 )
 
+# GameDock: a copy of the log for Settings > Logs
+import gamedock_system
+gamedock_system.log_to_file(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATEFMT))
+
 # Create main logger
 logger = logging.getLogger('main')
 logger.setLevel(logging.DEBUG)
@@ -179,6 +183,7 @@ import gamedock_i18n
 gamedock_i18n.install(app)
 import gamedock_users
 gamedock_users.install(app)
+gamedock_system.install(app)
 
 # Realtime WebSocket. ping_interval keeps idle sockets alive through proxies and lets
 # the server notice a peer that went away without closing.
