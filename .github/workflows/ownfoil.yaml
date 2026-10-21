@@ -1,0 +1,104 @@
+name: Versão nova do Ownfoil
+
+# Todo dia confere se saiu versão nova do Ownfoil. Quando sai, aplica as mudanças dela no
+# código do GameDock num branch e abre um pedido de atualização (pull request). O teste da
+# imagem roda nele; nada chega ao servidor sem você aprovar (Merge).
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Versões
+        id: v
+        run: |
+          current=$(cat UPSTREAM)
+          latest=$(curl -fsSL https://api.github.com/repos/a1ex4/ownfoil/releases/latest | jq -r .tag_name)
+          latest=${latest#v}
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "GameDock usa o Ownfoil $current; o mais recente é o $latest" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$latest" = "$current" ] || git ls-remote --exit-code origin "refs/heads/ownfoil-$latest" >/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Aplicar as mudanças do Ownfoil
+        if: steps.v.outputs.skip != 'true'
+        id: apply
+        env:
+          CURRENT: ${{ steps.v.outputs.current }}
+          LATEST: ${{ steps.v.outputs.latest }}
+        run: |
+          mkdir -p /tmp/up
+          for v in "$CURRENT" "$LATEST"; do
+            curl -fsSL "https://github.com/a1ex4/ownfoil/archive/refs/tags/$v.tar.gz" | tar -xz -C /tmp/up
+          done
+          old=$(ls -d /tmp/up/*-"$CURRENT"); new=$(ls -d /tmp/up/*-"$LATEST")
+          # Só o que vai para a imagem: app/ e o script de início (docker/run.sh = app/run.sh)
+          for d in "$old" "$new"; do mkdir -p "$d/app" && cp "$d/docker/run.sh" "$d/app/run.sh"; done
+          (cd /tmp/up && diff -ruN --exclude=__pycache__ "$(basename "$old")/app" "$(basename "$new")/app") > /tmp/ownfoil.patch || true
+          sed -i -E "s#^(---|\+\+\+) [^/]+/app/#\1 app/#" /tmp/ownfoil.patch
+          git config user.name "guslma"
+          git config user.email "141639311+guslma@users.noreply.github.com"
+          git checkout -b "ownfoil-$LATEST"
+          if git apply --3way --whitespace=nowarn /tmp/ownfoil.patch; then
+            echo "conflicts=false" >> "$GITHUB_OUTPUT"
+          else
+            # O que não encaixou fica marcado no código para resolver à mão
+            git apply --reject --whitespace=nowarn /tmp/ownfoil.patch || true
+            echo "conflicts=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "$LATEST" > UPSTREAM
+          sed -i "s/^ARG OWNFOIL_BASE=.*/ARG OWNFOIL_BASE=$LATEST/" Dockerfile
+          git add -A
+          git commit -q -m "Ownfoil $LATEST"
+          git push -q origin "ownfoil-$LATEST"
+
+      # Pedidos abertos por esta automação não disparam outros workflows, então o teste roda aqui
+      - name: Testar a imagem com a versão nova
+        if: steps.v.outputs.skip != 'true'
+        id: test
+        run: |
+          if docker build -q --build-arg OWNFOIL_BASE=${{ steps.v.outputs.latest }} -t gamedock:test . >/dev/null \
+             && tests/smoke.sh gamedock:test > /tmp/smoke.txt 2>&1; then
+            echo "result=passou" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=falhou" >> "$GITHUB_OUTPUT"
+          fi
+          cat /tmp/smoke.txt || true
+
+      - name: Pedido de atualização
+        if: steps.v.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST: ${{ steps.v.outputs.latest }}
+          CONFLICTS: ${{ steps.apply.outputs.conflicts }}
+          RESULT: ${{ steps.test.outputs.result }}
+        run: |
+          body="O Ownfoil $LATEST saiu. Este pedido traz as mudanças dele para o GameDock.
+
+          Notas da versão: https://github.com/a1ex4/ownfoil/releases/tag/$LATEST"
+          if [ "$CONFLICTS" = true ]; then
+            body="$body
+
+          **Algumas mudanças não encaixaram sozinhas** (arquivos .rej no branch): normalmente em telas que o GameDock reescreveu. Precisam de ajuste antes do Merge."
+          fi
+          body="$body
+
+          **Teste da imagem: $RESULT.** Ele sobe o app, entra e abre todas as telas nos 3 idiomas. Se passou, clique em Merge para atualizar o GameDock. Se falhou, peça o ajuste antes."
+          gh pr create --head "ownfoil-$LATEST" --base main --title "Ownfoil $LATEST" --body "$body" \
+            || gh issue create --title "Ownfoil $LATEST disponível" --body "$body
+
+          Branch com as mudanças: https://github.com/${{ github.repository }}/compare/main...ownfoil-$LATEST"

@@ -1,22 +1,26 @@
 <div align="center">
-  <img src="branding/logo/logo.svg" alt="GameDock" width="96" height="96">
+  <img src="app/static/logo/logo.svg" alt="GameDock" width="96" height="96">
   <h1>GameDock</h1>
   <p>A sua coleção de jogos de Nintendo Switch servida na sua rede, com a interface em português, inglês e espanhol.</p>
 </div>
 
-> **English:** GameDock is [Ownfoil](https://github.com/a1ex4/ownfoil) with a multi-language interface (English, Portuguese, Spanish). It follows every official Ownfoil release automatically. Use the image `ghcr.io/guslma/gamedock` in place of `a1ex4/ownfoil`.
+> **English:** GameDock is based on [Ownfoil](https://github.com/a1ex4/ownfoil), with a reorganized, easier interface in English, Portuguese and Spanish. New Ownfoil releases arrive as pull requests, tested before they are merged. Use the image `ghcr.io/guslma/gamedock` in place of `a1ex4/ownfoil`, with the same `config` and `data` folders.
 
 ## O que é
 
 O GameDock organiza os seus jogos de Nintendo Switch e os serve na rede para o Tinfoil, o Sphaira e outros clientes: biblioteca com capas, verificação dos arquivos, compressão, organização automática e estatísticas.
 
-Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e funciona igual a ele. As diferenças são o nome, a interface em vários idiomas e alguns recursos a mais:
+Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e usa as mesmas pastas e configurações. O que muda:
 
-- **Idioma automático:** cada pessoa vê o idioma do próprio navegador.
-- **Seletor no menu:** dá para trocar de idioma a qualquer momento, e a escolha fica salva no navegador.
-- **Biblioteca em lista:** além dos cartões e das capas, a biblioteca pode ser vista como lista, com nome, ID, tipo, versão e situação de cada jogo (o botão de lista vem desativado no Ownfoil).
-- **Edição de usuários:** em **Admin → Configurações**, o botão de lápis de cada usuário (desativado no Ownfoil) permite mudar o nome, a senha e as permissões.
-- **Sempre atualizado:** todo dia uma verificação confere se saiu versão nova do Ownfoil. Quando sai, a imagem do GameDock dessa versão é gerada e publicada sozinha.
+- **Telas reorganizadas:** no menu, **Biblioteca**, **Conectar o console** e **Admin**. No Admin, só três itens:
+  - **Visão geral:** os números da biblioteca, o que está rodando agora, os próximos agendamentos e avisos do que precisa de atenção.
+  - **Arquivos:** todos os arquivos, com filtros e ações (verificar, comprimir, identificar de novo, excluir).
+  - **Configurações**, em abas: Loja, Biblioteca, Usuários, Manutenção automática e Avançado, com um botão Salvar por aba e textos em linguagem simples.
+- **Conectar o console:** os endereços de casa e de fora de casa com botão de copiar, e os passos do Sphaira, do Tinfoil e do CyberFoil lado a lado.
+- **Idiomas:** português, inglês e espanhol. Cada pessoa vê o idioma do próprio navegador e pode trocar pelo menu.
+- **Biblioteca em lista**, além dos cartões e das capas, e filtros visíveis (jogos ou DLC, o que tenho ou não, atualização, DLC).
+- **Edição de usuários:** nome, senha e permissões.
+- **Atualizações do Ownfoil com segurança:** quando sai uma versão nova, um pedido de atualização (pull request) é aberto sozinho com as mudanças e o resultado de um teste que abre todas as telas. Nada chega ao servidor sem aprovação.
 
 ## Como instalar
 
@@ -70,28 +74,22 @@ sudo docker pull ghcr.io/guslma/gamedock:latest
 sudo docker rm -f gamedock
 ```
 
-Depois, rode de novo o comando de instalação. Para fixar uma versão, use a tag dela, como `ghcr.io/guslma/gamedock:2.5.0`. As tags seguem as versões do Ownfoil.
+Depois, rode de novo o comando de instalação. Para fixar uma versão, use a tag dela, como `ghcr.io/guslma/gamedock:1.0.0`.
 
 ## Como funciona
 
-A imagem parte da oficial (`a1ex4/ownfoil`) e muda só a interface:
-
-- [`locales/`](locales) tem um arquivo por idioma, com o texto original em inglês e a tradução.
-- [`build/translate.py`](build/translate.py) aplica as traduções nas páginas e nos scripts. Ele troca apenas textos inteiros e deixa intactos os valores que o código compara, então um texto que o dicionário não conhece continua em inglês, sem quebrar nada.
-- [`build/build.py`](build/build.py) gera uma cópia das páginas para cada idioma, troca o nome para GameDock e adiciona o seletor de idioma. Se uma versão nova do Ownfoil mudar algum ponto que ele altera, a geração da imagem para com um erro, em vez de publicar uma imagem pela metade.
-- [`build/gamedock_i18n.py`](build/gamedock_i18n.py) escolhe o idioma de cada acesso.
+- [`app/`](app) é o código do app. Começou do Ownfoil 2.5.0 (o arquivo [`UPSTREAM`](UPSTREAM) diz qual versão) e tem as telas e recursos do GameDock.
+- A imagem usa a oficial do Ownfoil da mesma versão só como base, pelo Python e pelas ferramentas que ela já traz, e troca o código do app pelo do GameDock ([`Dockerfile`](Dockerfile)).
+- As telas são escritas em inglês. [`i18n/localize.py`](i18n/localize.py) gera uma cópia delas para cada idioma com os dicionários de [`locales/`](locales), e [`app/gamedock_i18n.py`](app/gamedock_i18n.py) escolhe o idioma de cada acesso. Um texto que o dicionário não conhece continua em inglês, sem quebrar nada.
+- [`tests/smoke.sh`](tests/smoke.sh) sobe a imagem, entra e abre todas as telas nos 3 idiomas. Toda imagem passa por ele antes de ser publicada.
+- [`.github/workflows/ownfoil.yaml`](.github/workflows/ownfoil.yaml) confere todo dia se saiu versão nova do Ownfoil e abre o pedido de atualização.
 
 Os textos que ficaram sem tradução aparecem no resumo de cada execução em **Actions**.
 
 ### Adicionar um idioma
 
-1. Liste os textos de uma instalação do GameDock ou do Ownfoil:
-
-   ```bash
-   python3 build/translate.py /pasta/do/app textos.json
-   ```
-
-2. Copie `locales/es.json` para `locales/<código>.json` (por exemplo, `fr.json` ou `de.json`), troque `@name` pelo nome do idioma e traduza os valores. Os textos com `{{ }}` ou `{% %}` precisam manter esses trechos iguais, e as traduções não podem ter aspas.
+1. Copie `locales/es.json` para `locales/<código>.json` (por exemplo, `fr.json` ou `de.json`), troque `@name` pelo nome do idioma e traduza os valores. Os textos com `{{ }}` ou `{% %}` precisam manter esses trechos iguais, e as traduções não podem ter aspas.
+2. Para ver todos os textos de uma tela, rode `python3 i18n/translate.py app textos.json`.
 3. Envie o arquivo. A imagem nova já sai com o idioma no menu.
 
 ## Créditos e licença

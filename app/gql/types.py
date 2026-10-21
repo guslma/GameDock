@@ -1,0 +1,780 @@
+"""Strawberry GraphQL types for ownfoil.
+
+Batch-loaded fields use `null` to mean "not loaded on this path, or not exposed to
+this role" and `[]` to mean "loaded, and there is nothing". The two are not the same
+thing, and no client can tell them apart from the value alone - so every such field
+says in its description which paths hydrate it.
+"""
+import json
+from enum import Enum
+
+import strawberry
+from strawberry import Private
+from typing import List, Optional
+from typing_extensions import Annotated
+
+import media
+from db import verification_status
+
+from .docs import arg, desc, described, described_field
+from .filters import (
+    AppFilter, AppType, FileFilter, ImageSize, TitleSource, VerificationStatus,
+    match_app, match_file,
+)
+from .scalars import BigInt
+
+# Arguments shared by the nested list fields, annotated once so `Title.apps` and
+# `File.apps` describe them identically.
+NestedAppTypes = Annotated[Optional[List[AppType]], arg(
+    "Restrict to these kinds of content. A bare value is coerced to a one-element "
+    "list; an empty list is no constraint.")]
+NestedAppFilter = Annotated[Optional[AppFilter], arg(
+    "Field-level predicates, applied in memory to the already-loaded list. Same "
+    "semantics as the SQL the top-level `apps` query runs.")]
+NestedFileFilter = Annotated[Optional[FileFilter], arg(
+    "Field-level predicates, applied in memory to the already-loaded list. Same "
+    "semantics as the SQL the top-level `files` query runs.")]
+
+
+def decode_json_list(value) -> Optional[List[str]]:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(x) for x in value]
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        return None
+    if isinstance(decoded, list):
+        return [str(x) for x in decoded]
+    return None
+
+
+ImageSizeArg = Annotated[ImageSize, arg(
+    "Which rendition to link to. Defaults to `CLIENT`, the size of a title's own page.")]
+
+
+@described(strawberry.type)
+class Image:
+    """One piece of title artwork. `url` points at ownfoil's own media endpoint once a
+    local copy has been stored, and at the catalogue's URL until then - which is what
+    `local` distinguishes, since the two are otherwise indistinguishable to a client."""
+    url: str = desc("Where to load the image from. Local URLs are immutable and safe to "
+                    "cache indefinitely; upstream ones are not ownfoil's to promise.")
+    size: ImageSize = desc("The rendition this URL resolves to. An upstream URL is always "
+                           "`ORIGINAL`, whatever was asked for.")
+    local: bool = desc("True when ownfoil serves the bytes itself. False means no local "
+                       "copy exists yet and the client is being pointed at the catalogue.")
+    width: Optional[int] = desc(
+        "Pixel width of this rendition, so a layout can reserve the box before the image "
+        "loads. Null for an upstream URL, whose dimensions ownfoil has not measured.",
+        default=None)
+    height: Optional[int] = desc(
+        "Pixel height of this rendition. Null for an upstream URL, for the same reason "
+        "as `width`.", default=None)
+
+
+def _remote_image(url: Optional[str]) -> Optional[Image]:
+    """Fall back to the catalogue's own URL, so a title renders before its download runs."""
+    if not url:
+        return None
+    return Image(url=url, size=ImageSize.ORIGINAL, local=False)
+
+
+def _local_image(row, size: ImageSize) -> Image:
+    # Renditions are fitted to a box, so their size follows from the original's.
+    width, height = row.width, row.height
+    if size is not ImageSize.ORIGINAL and width and height:
+        width, height = media.fit((width, height), media.box(row.kind, size.value))
+    return Image(
+        url=media.url_for(row.title_id, row.kind, row.position, size.value, row.filename),
+        size=size, local=True, width=width, height=height)
+
+
+@described(strawberry.type)
+class Ownership:
+    """What the library holds for a title. Null on a title the library has never
+    seen - which is a different statement from all three flags being false."""
+    have_base: bool = desc("The base game is in the library. A title can own DLC or "
+                           "updates without this, if the base file was never added.")
+    up_to_date: bool = desc("No newer UPDATE version is known than the highest one "
+                            "owned. False also when nothing is owned at all.")
+    complete: bool = desc("Every DLC titledb attributes to this title is owned.")
+
+
+@described(strawberry.type)
+class Library:
+    """A configured library root. Admin only - the path is filesystem layout."""
+    id: strawberry.ID = desc("Primary key of the library row.")
+    path: str = desc("Absolute path of the library root on the server's filesystem.")
+    last_scan: Optional[str] = desc(
+        "When this root was last scanned, ISO 8601. Null if it never has been.",
+        default=None)
+
+
+@described(strawberry.enum)
+class TaskStatus(Enum):
+    """Every state a task row can be in. Cancelling deletes the row rather than
+    adding a terminal state, so there is no CANCELLED member."""
+    PENDING = strawberry.enum_value(
+        "pending", description="Queued, not yet picked up by a worker.")
+    RUNNING = strawberry.enum_value(
+        "running", description="Claimed by a worker and executing now.")
+    WAITING_FOR_CHILDREN = strawberry.enum_value(
+        "waiting_for_children",
+        description="Its own work is done; it stays open until its sub-tasks finish.")
+    COMPLETED = strawberry.enum_value(
+        "completed", description="Finished successfully.")
+    FAILED = strawberry.enum_value(
+        "failed", description="Raised, or was interrupted by a worker restart. "
+                              "Failed tasks persist until purged by hand.")
+
+
+@described(strawberry.type)
+class Task:
+    """A queued, running or finished background job."""
+    id: strawberry.ID = desc("Primary key of the task row.")
+    task_name: str = desc("Which registered task this is, e.g. `scan_library`. The "
+                          "name determines the shape of `input`.")
+    display_name: str = desc(
+        "Human-readable label built from `taskName` and `input`, e.g. `Compress "
+        "game.nsp`. Falls back to the humanised task name when the input no longer "
+        "matches what the task expects.")
+    status: TaskStatus = desc("Where the task is in its lifecycle.")
+    completion_pct: int = desc("Progress, 0-100. Only tasks that report progress "
+                               "move it off 0 before finishing.", default=0)
+    exit_code: Optional[int] = desc(
+        "0 on success, non-zero on failure. Null while the task has not finished.",
+        default=None)
+    error_message: Optional[str] = desc(
+        "Why the task failed. Null unless `status` is FAILED.", default=None)
+    created_at: Optional[str] = desc("When the task was enqueued, ISO 8601.",
+                                     default=None)
+    started_at: Optional[str] = desc(
+        "When a worker claimed it, ISO 8601. Null while PENDING.", default=None)
+    completed_at: Optional[str] = desc(
+        "When it reached a terminal state, ISO 8601. Null until then.", default=None)
+    run_after: Optional[str] = desc(
+        "Earliest time this task may start, ISO 8601 - set on work that is "
+        "deliberately deferred. Null for tasks eligible immediately.", default=None)
+    parent_id: Optional[strawberry.ID] = desc(
+        "The task that spawned this one. Null for top-level tasks, which are the "
+        "only ones `tasks` returns unless `includeChildren` is set.", default=None)
+    worker_id: Optional[int] = desc(
+        "Which worker process claimed this task. Null until a worker picks it up.",
+        default=None)
+    input: Optional[str] = desc(
+        "The task's arguments, as a JSON object string. JSON rather than a typed "
+        "field because the payload shape differs per task name, and the schema "
+        "cannot describe a union of every registered task's input.", default=None)
+    output: Optional[str] = desc(
+        "Whatever the task recorded on finishing, as a JSON string. Null until it "
+        "finishes, and for tasks that report nothing.", default=None)
+
+    children_loaded: Private[Optional[List["Task"]]] = None
+
+    @described_field
+    def children(self) -> Optional[List["Task"]]:
+        """Sub-tasks spawned by this one, e.g. the per-library `scan_library` jobs
+        under a `scan_libraries`. Only hydrated when selected; null otherwise."""
+        return self.children_loaded
+
+
+@described(strawberry.type)
+class Worker:
+    """One task worker subprocess in the pool."""
+    id: int = desc("The worker's number in the pool, matching `Task.workerId`.")
+    pid: Optional[int] = desc(
+        "Operating system process id, or null if the process never started.",
+        default=None)
+    alive: bool = desc("Whether the process is still running.", default=False)
+    current_task: Optional[Task] = desc(
+        "The task this worker is executing right now, or null if it is idle.",
+        default=None)
+
+
+@described(strawberry.type)
+class AppTypeCount:
+    """Apps of one type, split by whether the library holds them. Both figures rather
+    than one: a bucket counting only owned apps cannot say what is missing, and one
+    counting everything cannot say what is there."""
+    key: str = desc("The app type grouped on: `BASE`, `UPDATE` or `DLC`.")
+    count: int = desc("App rows of this type, owned or not.")
+    owned: int = desc("How many of them are backed by at least one file.", default=0)
+
+
+@described(strawberry.type)
+class SizedCountByKey:
+    """A bucket whose rows are files, so the bytes they account for are meaningful."""
+    key: str = desc("The value grouped on, e.g. a file extension or a library path.")
+    count: int = desc("How many files fell into this bucket.")
+    size: BigInt = desc("Total bytes of the files in this bucket.", default=0)
+
+
+@described(strawberry.type)
+class VerificationStatusCount:
+    """Files sharing one verification verdict. Typed rather than a `SizedCountByKey`
+    so the bucket can be handed straight back to `files(filter: {verificationStatus:})`
+    without a string round-trip."""
+    status: VerificationStatus = desc("The verdict this bucket groups on.")
+    count: int = desc("How many files carry it.")
+    size: BigInt = desc("Total bytes of the files in this bucket.", default=0)
+
+
+@described(strawberry.type)
+class LibraryStats:
+    """Library-wide aggregates, for dashboards. Each field is computed only when
+    selected, so asking for one count does not pay for the others. The file-level
+    figures are admin only and read 0 for any other role."""
+    total_files: int = desc("Files tracked in the library. Admin only.", default=0)
+    total_size: BigInt = desc("Total bytes of every tracked file. Admin only.",
+                              default=0)
+    identified_files: int = desc(
+        "Files matched to an app. Admin only.", default=0)
+    unidentified_files: int = desc(
+        "`totalFiles` minus `identifiedFiles` - files ownfoil could not match, which "
+        "is the queue of things needing attention. Admin only.", default=0)
+    total_titles: int = desc(
+        "Titles in the titledb catalogue - the whole known universe of games, not "
+        "the ones owned. Compare `ownedTitles`.", default=0)
+    owned_titles: int = desc(
+        "Titles whose base game is in the library.", default=0)
+    complete_titles: int = desc(
+        "Owned titles whose DLC set is complete. Counted over owned titles only, so "
+        "it never exceeds `ownedTitles`.", default=0)
+    up_to_date_titles: int = desc(
+        "Owned titles carrying the latest known update. Counted over owned titles "
+        "only, so it never exceeds `ownedTitles`.", default=0)
+    total_apps: int = desc(
+        "App rows, owned or not: every base, update and DLC ownfoil knows about for "
+        "the titles it tracks.", default=0)
+    owned_apps: int = desc("App rows backed by at least one file.", default=0)
+    files_by_extension: Optional[List[SizedCountByKey]] = desc(
+        "File count and bytes per extension, most files first. Admin only; null for "
+        "any other role.", default=None)
+    apps_by_type: Optional[List[AppTypeCount]] = desc(
+        "App count per type (BASE/UPDATE/DLC), owned and total. No byte totals: apps "
+        "are metadata rows, and the files behind them are counted by "
+        "`filesByExtension`.", default=None)
+    files_by_library: Optional[List[SizedCountByKey]] = desc(
+        "File count and bytes per configured library root, keyed by path. Includes "
+        "roots holding nothing. Admin only; null for any other role.", default=None)
+    files_by_verification_status: Optional[List[VerificationStatusCount]] = desc(
+        "File count and bytes per `File.verificationStatus`, best verdict first and "
+        "`UNVERIFIED` last. Always all seven buckets, empty ones included - the set is "
+        "closed, and `CORRUPT: 0` says something a missing bucket does not. Note "
+        "`SIGNATURE_OK` and `SIGNATURE_FAILED` can only be non-zero while verification "
+        "runs at `signature` depth. Admin only; null for any other role.", default=None)
+    duplicates: Optional["CleanupSummary"] = desc(
+        "What the `duplicates` query lists, counted. As costly as that query: it ranks "
+        "every copy. Admin only; null for any other role.", default=None)
+    outdated_updates: Optional["CleanupSummary"] = desc(
+        "What the `outdatedUpdates` query lists, counted. Admin only; null for any other "
+        "role.", default=None)
+    pending_files: int = desc(
+        "Files with pipeline work still due, as `pendingFiles.total`. Checks every file "
+        "against the current settings. Admin only.", default=0)
+
+
+@described(strawberry.type)
+class File:
+    """One file on disk that ownfoil tracks. The whole type is admin only - the
+    `files` query returns nothing at all for any other role."""
+    id: strawberry.ID = desc("Primary key of the file row.")
+    library_id: int = desc("Which configured library root this file sits under. "
+                           "`library` resolves the root itself.")
+    filename: str = desc("File name with extension, no directory part.")
+    folder: Optional[str] = desc(
+        "Directory holding the file, relative to its library root. Null for a file "
+        "sitting at the root itself.", default=None)
+    extension: Optional[str] = desc(
+        "Lowercase extension without the dot, e.g. `nsp`, `nsz`.", default=None)
+    size: Optional[BigInt] = desc(
+        "Size in bytes. A 64-bit scalar, because game files routinely exceed the "
+        "2^31 a GraphQL `Int` can carry.", default=None)
+    compressed: bool = desc(
+        "The file is in a compressed container (NSZ/XCZ) rather than NSP/XCI.",
+        default=False)
+    multicontent: bool = desc(
+        "The file carries more than one app - a bundle of base plus updates or DLC. "
+        "`apps` lists them and `nbContent` counts them.", default=False)
+    nb_content: int = desc("How many apps this file carries; 1 for an ordinary file.",
+                           default=0)
+    download_count: int = desc("How many times a shop client has downloaded it.",
+                               default=0)
+    identified: bool = desc(
+        "Ownfoil worked out which app(s) this file contains. Unidentified files stay "
+        "in the library but cannot be served meaningfully.", default=False)
+    identification_type: Optional[str] = desc(
+        "How the file was identified - by reading the file's own metadata, or by "
+        "parsing its name. Null while unidentified.", default=None)
+    identification_error: Optional[str] = desc(
+        "Why identification failed, if it did. Null otherwise.", default=None)
+    identification_attempts: int = desc(
+        "How many times identification has been tried. Rises only on failure; a "
+        "large value means a file that keeps refusing to identify.", default=0)
+    organized: bool = desc(
+        "The file sits where the configured naming template says it should. False "
+        "means a re-organize would move or rename it.", default=False)
+    signature_valid: Optional[bool] = desc(
+        "Whether every NCA header signature checked out, and the container decrypted "
+        "with the configured keys. `true` means the signature is Nintendo's, "
+        "`false` means re-signed, which a repack commonly is. "
+        "Null means never verified.", default=None)
+    hash_valid: Optional[bool] = desc(
+        "Whether every NCA's content hashed to what its name and CNMT claim. "
+        "`true` means integrity of the content is verified valid. "
+        "Null unless verification ran at `hash` depth.", default=None)
+    hash_modified: Optional[bool] = desc(
+        "Splits a `hashValid: false` in two. `true` means the failing contents are still "
+        "filed under exactly the names the container's CNMT records, so they were "
+        "rewritten in place rather than damaged or swapped. Null when the contents were "
+        "never hashed, and on rows verified before this was recorded.", default=None)
+    verification_error: Optional[str] = desc(
+        "List of verification errors, if anything. Null when the file passed or was "
+        "never checked.", default=None)
+    verified_at: Optional[str] = desc(
+        "When verification last ran. The verdicts describe the bytes as of then; a "
+        "change on disk clears all four fields.", default=None)
+    mtime: Optional[float] = desc(
+        "Filesystem modification time, Unix epoch seconds. Rewritten by a copy or a "
+        "re-organize, so it is not a reliable 'when did I get this'.", default=None)
+    added_at: Optional[str] = desc(
+        "When ownfoil first saw this file. Distinct from `mtime`, which a re-organize "
+        "or a copy rewrites - sort by this for a 'recently added' view.", default=None)
+    filepath: Optional[str] = desc(
+        "Absolute path on the server. Admin only - null for any other role, since it "
+        "exposes filesystem layout.", default=None)
+
+    # Apps linked to this file via the app_files m2m table. Eagerly batch-loaded
+    # by resolvers; None means "not exposed for this path/role".
+    apps_loaded: Private[Optional[List["App"]]] = None
+    library_loaded: Private[Optional[Library]] = None
+    # (title id, title name, app type) per app carried, for `FileFilter.title` and
+    # `FileFilter.appType` under `App.files`.
+    contents_loaded: Private[Optional[List[tuple]]] = None
+
+    @described_field
+    def verification_status(self) -> VerificationStatus:
+        """`signatureValid`, `hashValid` and `hashModified` read as one label - which of
+        them matters depends on the others, and a client that reasons about them
+        separately gets it wrong. `filter: {verificationStatus:}` selects on the same
+        rule."""
+        return VerificationStatus(verification_status(self))
+
+    @described_field
+    def library(self) -> Optional[Library]:
+        """The library root this file was found under. Admin only."""
+        return self.library_loaded
+
+    @described_field
+    def apps(
+        self,
+        app_type: NestedAppTypes = None,
+        filter: NestedAppFilter = None,
+    ) -> Optional[List["App"]]:
+        """The apps this file carries, across the app_files m2m. Usually one; more for
+        a multicontent bundle. Admin only, and only hydrated under the top-level
+        `files` query.
+
+        Unlike `Title.apps` this takes no `owned` argument: an app is owned exactly
+        when it has files, so everything reachable from a file is owned by
+        construction and the filter could only ever return all of them or none.
+        `filter: {owned: ...}` is still accepted here - the input type is shared with
+        `Title.apps` - and is subject to the same tautology."""
+        if self.apps_loaded is None:
+            return None
+        return [a for a in self.apps_loaded if match_app(a, None, filter, app_type)]
+
+
+@described(strawberry.type)
+class AppVersion:
+    """One known version of the content an app represents, with ownership attached."""
+    version: int = desc("The version number, as Nintendo counts them: 0 for a launch "
+                        "release, then multiples of 65536.")
+    owned: bool = desc("This exact version is in the library.")
+    release_date: Optional[str] = desc(
+        "When this version shipped, as titledb reports it. Null when unknown.",
+        default=None)
+    display_version: Optional[str] = desc(
+        "The version string this version's own file reports about itself, as "
+        "`App.displayVersion` does. Null on a version no owned file carries, and "
+        "until that file has been through metadata extraction.", default=None)
+
+
+@described(strawberry.type)
+class TitledbVersion:
+    """A version titledb knows about, with no ownership attached - this is catalogue
+    data, and it exists for titles the library has never seen."""
+    version: int = desc("The version number, as Nintendo counts them.")
+    release_date: Optional[str] = desc(
+        "When this version shipped. Null when titledb does not say.", default=None)
+
+
+@described(strawberry.type)
+class TitledbDlc:
+    """A DLC titledb attributes to a title, again independent of ownership."""
+    app_id: str = desc("The DLC's own 16-hex-digit application id - the title id's "
+                       "first thirteen digits plus one, then this DLC's index.")
+    version: Optional[int] = desc(
+        "Highest version titledb knows for this DLC. Null when it says nothing.",
+        default=None)
+    titledb: Optional["Title"] = desc(
+        "The DLC's own catalogue metadata - its name and art, which is what a "
+        "'missing DLC' list needs to show. Null when titledb has no entry for it.",
+        default=None)
+
+
+@described(strawberry.type)
+class App:
+    """One piece of installable content: a base game, an update, or a DLC. An app is
+    a (application id, version) pair, and it is `owned` exactly when a file carries
+    it."""
+    id: strawberry.ID = desc("Primary key of the app row.")
+    title_id: str = desc("The 16-hex-digit id of the title this belongs to, uppercase "
+                         "and ending in `000`. Equal to `appId` only for a BASE app.")
+    app_id: str = desc("This content's own 16-hex-digit application id: the title id "
+                       "itself for BASE, its trailing `000` replaced by `800` for "
+                       "UPDATE, and its first thirteen digits plus one followed by a "
+                       "per-DLC index for DLC. `AppType` spells each case out.")
+    app_version: int = desc(
+        "The content version, as an integer - the same quantity `AppVersion.version` "
+        "reports. Stored as text in the database, so it is cast on the way out; a "
+        "non-numeric value reads as 0, matching what SQL comparisons on it do.")
+    app_type: AppType = desc("Which kind of content this app is.")
+    owned: bool = desc(
+        "At least one file in the library carries this app. Under "
+        "`apps(groupByAppId: true)` this is group-level: true when any version of the "
+        "app id is owned. With no ownership filter the item shown is the group's "
+        "highest version, owned or not; under `owned: true` it is the highest version "
+        "a file actually carries, so the item is always one that can be served.")
+    release_date: Optional[str] = desc(
+        "When this version shipped, as titledb records it for this app id and version - "
+        "so BASE and DLC rows carry one too, not only UPDATE rows. Null when the "
+        "catalogue has no date for that particular version.", default=None)
+    display_version: Optional[str] = desc(
+        "The version string the game shows about itself, e.g. `1.0.1`, read out of the "
+        "file's own Control NCA. Unrelated to `appVersion`, which is the number Nintendo "
+        "counts in: a title's `1.0.1` may be `appVersion` 65536. Null until the file has "
+        "been through metadata extraction, and on apps no owned file carries.", default=None)
+
+    title: Optional["Title"] = desc(
+        "The parent title, so a card built from an app can show the title's name and "
+        "ownership without a second round trip - and so a file list can name the game "
+        "behind an UPDATE file, whose own titledb row usually does not exist. "
+        "Hydrated by the `apps` and `files` queries. Null under `Title.apps`, where "
+        "the parent already is the title, and for apps reached as a file's back-link "
+        "under `apps { files { apps } }`.", default=None)
+
+    versions: Optional[List[AppVersion]] = desc(
+        "Every version known for the content this app represents: for BASE apps that "
+        "means the title's UPDATE apps (a Switch update ships under its own app id), "
+        "for anything else the versions of this same app id. Ascending. Hydrated by "
+        "the `apps`, `title`, `titles` and `files` queries; null for apps reached as a "
+        "file's back-link under `apps { files { apps } }`.", default=None)
+
+    latest_owned_version: Optional[AppVersion] = desc(
+        "The highest version of what `versions` covers that the shop actually holds a "
+        "file for - for a BASE app, the newest update it could install. Null when it "
+        "holds none. Hydrated by the same queries as `versions`, and answers on its own "
+        "the question a client would otherwise pull the whole history to work out.",
+        default=None)
+
+    added_at: Optional[str] = desc(
+        "When ownfoil first saw this app - the newest `addedAt` among the files "
+        "carrying it, since an app has no timestamp of its own. Null for an app no "
+        "file carries, and for apps reached as a file's back-link under "
+        "`apps { files { apps } }`. `orderBy: {field: ADDED_AT}` sorts on it.",
+        default=None)
+
+    # Eagerly batch-loaded by the apps/titles resolvers (admin only). None means
+    # "not exposed for this role"; an empty list means "exposed but no files".
+    files_loaded: Private[Optional[List[File]]] = None
+    titledb_loaded: Private[Optional["Title"]] = None
+    download_token_loaded: Private[Optional[str]] = None
+    download_size_loaded: Private[Optional[int]] = None
+    download_extension_loaded: Private[Optional[str]] = None
+
+    @described_field
+    def files(self, filter: NestedFileFilter = None) -> Optional[List[File]]:
+        """The files that carry this app - more than one when the same content sits in
+        the library twice. Admin only: null for any other role, and null for apps
+        reached as a file's back-link (the recursion stops there)."""
+        if self.files_loaded is None:
+            return None
+        return [f for f in self.files_loaded if match_file(f, filter)]
+
+    @described_field
+    def download_url(self) -> Optional[str]:
+        """Where to download this app, as a path on this server. Unlike `files` it is
+        not admin only - it is what a shop client reads the catalogue for.
+
+        An app can be carried by several files (an original and a compressed copy
+        cataloged side by side, say) and this names one of them, the same copy
+        deduplication keeps: an intact file before a broken one (`SIGNATURE_FAILED`,
+        `MODIFIED`, `CORRUPT`), then a single-content file before a bundle (or the reverse
+        when the library prefers bundles), then one identified from its CNMT over its filename, then the
+        soundest `verificationStatus`, then the compressed container, then an organized
+        one, and finally the earliest added. Null for an app no file carries,
+        and for apps reached as a file's back-link under `apps { files { apps } }`.
+        The token is opaque and per-file; `files { id }` addresses the same bytes by
+        primary key."""
+        if self.download_token_loaded is None:
+            return None
+        return f"/api/download/{self.download_token_loaded}"
+
+    @described_field
+    def download_size(self) -> Optional[BigInt]:
+        """Size in bytes of the file `downloadUrl` points at.
+
+        Named after `downloadUrl` rather than called `size`, because an app can be
+        carried by several files: this describes the one that URL resolves to, not
+        the app. A 64-bit scalar for the same reason `File.size` is one. Null exactly
+        when `downloadUrl` is null. Not admin only - a shop client needs it to check
+        it has room for the download before starting one."""
+        return self.download_size_loaded
+
+    @described_field
+    def download_extension(self) -> Optional[str]:
+        """Container of the file `downloadUrl` points at: lowercase, no dot, e.g.
+        `nsp`, `nsz`, `xci`, `xcz`.
+
+        Null exactly when `downloadUrl` is null. Not admin only: the download itself
+        is served without a filename, so this is the only thing telling a client
+        which container it is about to read."""
+        return self.download_extension_loaded
+
+    @described_field
+    def titledb(self) -> Optional["Title"]:
+        """Titledb entry keyed by this app's app_id (the DLC's own metadata for
+        DLC apps, the parent title's metadata for BASE apps, often null for
+        UPDATE apps not present in titledb). Not hydrated for apps reached as a
+        file's back-link under `apps { files { apps } }`."""
+        return self.titledb_loaded
+
+
+@described(strawberry.type)
+class Title:
+    """A game, as the titledb catalogue describes it - which exists whether or not
+    anything is owned. Everything from `name` down is metadata passed through from
+    titledb, merged across its sources at import time; ownership lives on
+    `ownership` and `apps`."""
+    title_id: strawberry.ID = desc("The 16-hex-digit title id, uppercase.")
+    source: TitleSource = desc(
+        "The highest-priority source that contributed a field to this title. Lower "
+        "sources still fill in what it left unset, so this names the winner rather "
+        "than the only contributor - `TitleSource` gives what each one means.")
+    name: Optional[str] = desc("The game's name. Null for a title no source names.",
+                               default=None)
+    banner_url_raw: Private[Optional[str]] = None
+    icon_url_raw: Private[Optional[str]] = None
+    description: Optional[str] = desc("Long-form store description.", default=None)
+    intro: Optional[str] = desc("Short tagline, where the store has one.", default=None)
+    developer: Optional[str] = desc("Studio that made the game.", default=None)
+    publisher: Optional[str] = desc("Publisher of record.", default=None)
+    release_date: Optional[str] = desc(
+        "Original release date as titledb reports it - the format is the catalogue's, "
+        "not a normalized one, so sort with `orderBy: {field: RELEASE_DATE}` rather "
+        "than parsing it.", default=None)
+    category: Optional[List[str]] = desc(
+        "Genre tags. Stored JSON-encoded, so `TitleFilter.category` takes a "
+        "`StringListFilter` whose operators name elements.", default=None)
+    is_demo: Optional[str] = desc(
+        "Whether the entry is a demo, as titledb spells it - a string, not a boolean, "
+        "because the catalogue is not consistent about it.", default=None)
+    nsu_id: Optional[str] = desc("Nintendo eShop identifier, where one is known.",
+                                 default=None)
+    number_of_players: Optional[str] = desc(
+        "Supported player count, as titledb spells it.", default=None)
+    parent_id: Optional[str] = desc(
+        "Title id this entry belongs under, for regional variants that share a game.",
+        default=None)
+    rank: Optional[str] = desc("Store popularity rank, where the catalogue has one.",
+                              default=None)
+    rating: Optional[str] = desc("Age rating value for `region`.", default=None)
+    rating_content: Optional[List[str]] = desc(
+        "Content descriptors behind the rating, e.g. violence.", default=None)
+    region: Optional[str] = desc("Primary region this entry describes.", default=None)
+    regions: Optional[List[str]] = desc("Every region the title released in.",
+                                        default=None)
+    languages: Optional[List[str]] = desc("Languages the title supports.",
+                                          default=None)
+    language: Optional[str] = desc("Primary language of this catalogue entry.",
+                                   default=None)
+    rights_id: Optional[str] = desc("Rights id, as used by the content's DRM.",
+                                    default=None)
+    screenshots_raw: Private[Optional[List[str]]] = None
+    size: Optional[str] = desc(
+        "Install size as titledb reports it - a string, unlike `File.size`, because "
+        "the catalogue value is not reliably numeric. Sorting by SIZE casts it.",
+        default=None)
+    version: Optional[str] = desc(
+        "Latest version titledb records for the title. `availableVersions` is the "
+        "full list.", default=None)
+    nca_key: Optional[str] = desc(
+        "Title key from the catalogue (`key` upstream), where present.", default=None)
+    ids: Optional[List[str]] = desc(
+        "Every application id the catalogue associates with this title.", default=None)
+    ownership: Optional[Ownership] = desc(
+        "What the library holds for this title. Null for a title that is only in the "
+        "catalogue - which is why it is not three booleans on this type.", default=None)
+
+    # Eagerly batch-loaded by the titles resolver. None means "not exposed for
+    # this role"; an empty list means "exposed but no apps". Hidden from the
+    # schema via Private; clients access it through the apps() resolver below.
+    apps_loaded: Private[Optional[List[App]]] = None
+    available_versions_loaded: Private[Optional[List[TitledbVersion]]] = None
+    available_dlc_loaded: Private[Optional[List[TitledbDlc]]] = None
+    # {(kind, position): media row} for the local copies of this title's artwork.
+    media_loaded: Private[Optional[dict]] = None
+
+    def _image(self, kind, position, url, size):
+        row = (self.media_loaded or {}).get((kind, position))
+        return _local_image(row, size) if row is not None else _remote_image(url)
+
+    @described_field
+    def icon(self, size: ImageSizeArg = ImageSize.CLIENT) -> Optional[Image]:
+        """The square icon artwork. Null when no source has one for this title."""
+        return self._image(media.ICON, 0, self.icon_url_raw, size)
+
+    @described_field
+    def banner(self, size: ImageSizeArg = ImageSize.CLIENT) -> Optional[Image]:
+        """The wide banner artwork, which is what a card view shows. Null when no source
+        has one - most catalogue entries have a banner and nothing else."""
+        return self._image(media.BANNER, 0, self.banner_url_raw, size)
+
+    @described_field
+    def screenshots(self, size: ImageSizeArg = ImageSize.CLIENT) -> Optional[List[Image]]:
+        """Store screenshots, in the catalogue's own order. Null when the title has none;
+        individual entries are never null, so the list index is the position."""
+        urls = self.screenshots_raw
+        if urls is None:
+            return None
+        return [self._image(media.SCREENSHOT, i, url, size) for i, url in enumerate(urls)]
+
+    @described_field
+    def available_versions(self) -> Optional[List[TitledbVersion]]:
+        """Every version titledb knows for this title, ascending. Unlike
+        `apps { versions }` this does not need the title to be in the library, so a
+        catalogue or wishlist view can show what a title would involve owning."""
+        return self.available_versions_loaded
+
+    @described_field
+    def available_dlc(self) -> Optional[List[TitledbDlc]]:
+        """Every DLC titledb attributes to this title, whether or not it is owned -
+        the answer to "what am I missing" for a title the library has never seen."""
+        return self.available_dlc_loaded
+
+    @described_field
+    def apps(
+        self,
+        owned: Annotated[Optional[bool], arg(
+            "Restrict to owned or unowned apps. Omit for both - which is what makes "
+            "'what am I missing' answerable.")] = None,
+        app_type: NestedAppTypes = None,
+        filter: NestedAppFilter = None,
+    ) -> Optional[List[App]]:
+        """The base, update and DLC apps ownfoil tracks for this title - including
+        unowned ones, which is what makes "what am I missing" answerable. Null when
+        not hydrated on this path or not exposed to this role."""
+        if self.apps_loaded is None:
+            return None
+        return [a for a in self.apps_loaded if match_app(a, owned, filter, app_type)]
+
+
+@described(strawberry.type)
+class TitleConnection:
+    """One page of titles."""
+    total: int = desc("Titles matching the query across every page, before paging. "
+                      "Computed only when selected.")
+    items: List[Title] = desc("The titles on the requested page.")
+
+
+@described(strawberry.type)
+class AppConnection:
+    """One page of apps."""
+    total: int = desc("Apps matching the query across every page, before paging - "
+                      "distinct app ids under `groupByAppId: true`. Computed only "
+                      "when selected.")
+    items: List[App] = desc("The apps on the requested page.")
+
+
+@described(strawberry.type)
+class FileConnection:
+    """One page of files."""
+    total: int = desc("Files matching the query across every page, before paging. "
+                      "Computed only when selected.")
+    items: List[File] = desc("The files on the requested page.")
+
+
+@described(strawberry.enum)
+class CleanupReason(Enum):
+    """Why a cleanup pass deletes a file rather than the one it keeps. For a duplicate,
+    the first criterion of the copy ranking on which the kept copy won, in ranking
+    order."""
+    BROKEN = strawberry.enum_value(
+        "broken", description="This copy failed verification and the kept one did not.")
+    BUNDLE = strawberry.enum_value(
+        "bundle", description="The kept copy matches the multi-content preference and "
+                              "this one does not.")
+    IDENTIFICATION = strawberry.enum_value(
+        "identification", description="The kept copy was identified from its CNMT, this "
+                                      "one from its filename.")
+    VERIFICATION = strawberry.enum_value(
+        "verification", description="The kept copy has the better verification status.")
+    COMPRESSED = strawberry.enum_value(
+        "compressed", description="The kept copy is compressed and this one is not.")
+    ORGANIZED = strawberry.enum_value(
+        "organized", description="The kept copy is organized and this one is not.")
+    ADDED = strawberry.enum_value(
+        "added", description="The kept copy was added to the library first.")
+    ORDER = strawberry.enum_value(
+        "order", description="The copies tie on every criterion; the kept copy was "
+                             "tracked first.")
+    OLDER_VERSION = strawberry.enum_value(
+        "older_version", description="An outdated update: the kept files carry a newer "
+                                     "version of it.")
+
+
+@described(strawberry.type)
+class CleanupRemoval:
+    """A file a cleanup pass would delete, and why."""
+    file: File = desc("The file to delete.")
+    reason: CleanupReason = desc("Why it goes rather than the file kept.")
+
+
+@described(strawberry.type)
+class CleanupGroup:
+    """What a cleanup pass would do to one app's copies: the files it keeps and the files
+    it would delete. Computed on read against the current library, so it previews the
+    pass rather than recording one."""
+    app: App = desc("The app the group is about: the app whose copies are compared "
+                    "for `duplicates`, the newest owned update for `outdatedUpdates`.")
+    keep: List[File] = desc("Files the pass keeps: the best copy of the app for "
+                            "`duplicates`, the newest update's files for `outdatedUpdates`.")
+    remove: List[CleanupRemoval] = desc(
+        "Files the pass would delete. A bundle deleted as a duplicate appears in the "
+        "group of each app it carries, with the reason that group's comparison gives.")
+
+
+@described(strawberry.type)
+class CleanupSummary:
+    """The size of a cleanup pass, without its groups."""
+    files: int = desc("Distinct files the pass would delete; a bundle in several groups "
+                      "counts once.")
+    size: BigInt = desc("Bytes those files take, which the pass would free.", default=0)
+
+
+@described(strawberry.type)
+class PendingFile:
+    """A file with pipeline work still due under the current settings."""
+    file: File = desc("The file with work due.")
+    stages: List[str] = desc("The pipeline stages it still needs, in the order they run: "
+                             "`read`, `organize`, `verify`, `compress`.")
+
+
+@described(strawberry.type)
+class PendingFileList:
+    """Files with pipeline work still due, capped at the requested limit."""
+    total: int = desc("How many files have work due, including those past the limit.")
+    items: List[PendingFile] = desc("The first files with work due, by primary key.")

@@ -1,0 +1,41 @@
+{% set gd_path = request.path %}
+<nav class="navbar navbar-expand-lg gd-topbar {% if transparent_nav %}title-nav{% endif %}" data-bs-theme="dark">
+    <div class="container-fluid px-3 px-lg-4">
+        <a class="navbar-brand p-0" href="#" role="button" data-bs-toggle="modal" data-bs-target="#aboutModal" title="About GameDock">
+            <img src="{{ url_for('static', filename='logo/logo.svg') }}" alt="" width="32" height="32">
+            {{ shop_name }}
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav gap-1 ms-lg-3">
+                <li class="nav-item">
+                    <a class="nav-link{% if gd_path == '/' or gd_path.startswith('/title') %} active" aria-current="page{% endif %}" href="/">Library</a>
+                </li>
+                {% if admin_account_created == false or (current_user.is_authenticated and current_user.has_shop_access()) %}
+                <li class="nav-item">
+                    <a class="nav-link{% if gd_path.startswith('/setup') %} active" aria-current="page{% endif %}" href="/setup">Connect your console</a>
+                </li>
+                {% endif %}
+                {% if current_user.is_admin or admin_account_created == false %}
+                <li class="nav-item">
+                    <a class="nav-link{% if gd_path.startswith('/admin') %} active" aria-current="page{% endif %}" href="/admin">Admin</a>
+                </li>
+                {% endif %}
+            </ul>
+            <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
+                {% include 'language.html' %}
+                <li class="nav-item">
+                    {% if current_user.is_authenticated %}
+                    <a class="btn btn-outline-secondary" href="/logout" role="button">Logout</a>
+                    {% else %}
+                    <a class="btn btn-outline-secondary" href="/login" role="button">Login</a>
+                    {% endif %}
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+{% include 'about.html' %}

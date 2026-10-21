@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+{% include 'nav.html' %}
+
+<div class="container-fluid setting-body">
+    <div class="row g-0">
+        <nav class="settings-sidebar" aria-label="Admin">
+            <ul class="nav flex-column gap-1">
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path == '/admin' %} active{% endif %}" href="/admin">
+                        <i class="bi bi-speedometer2" aria-hidden="true"></i> Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path.startswith('/admin/files') %} active{% endif %}" href="/admin/files">
+                        <i class="bi bi-folder2" aria-hidden="true"></i> Files
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path.startswith('/admin/settings') %} active{% endif %}" href="/admin/settings">
+                        <i class="bi bi-gear" aria-hidden="true"></i> Settings
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <div class="col settings-panel">
+            {% block panel %}{% endblock %}
+        </div>
+    </div>
+</div>
+
+{% block panel_scripts %}{% endblock %}
+{% endblock %}

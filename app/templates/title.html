@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="title-page">
+    {% with transparent_nav=True %}{% include 'nav.html' %}{% endwith %}
+
+    <div class="title-banner" id="titleBanner"></div>
+    <div class="title-scrim"></div>
+    <div class="title-hero"></div>
+
+    <div class="title-panel">
+        <div class="title-body" id="titleBody">
+            <p class="text-secondary">Loading…</p>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/format.js') }}"></script>
+<script>
+    // The whole page is one GraphQL call: the title's metadata, and every app ownfoil
+    // knows for it - owned or missing, since add_missing_apps_for_title expands the
+    // catalogue into app rows, which is what makes the list answer "what am I missing".
+    // `files` is admin only and carries the sizes; a shopper gets null and no size badge.
+    // The icon and the slideshow take the CLIENT rendition, whose 256px and 640px are
+    // exactly the boxes they render into; the full-bleed banner and the lightbox, which
+    // both scale past that, take the original.
+    const TITLE_ID = {{ title_id|tojson }};
+    const SHOP_NAME = {{ shop_name|tojson }};
+
+    const TITLE_QUERY = `
+        query TitleDetails($titleId: ID!) {
+            title(titleId: $titleId) {
+                titleId name intro description
+                developer publisher releaseDate category numberOfPlayers
+                rating ratingContent size nsuId
+                icon(size: ORIGINAL) { url }
+                banner(size: ORIGINAL) { url }
+                screenshots { url }
+                screenshotsFull: screenshots(size: ORIGINAL) { url }
+                apps {
+                    appId appType appVersion owned releaseDate displayVersion
+                    titledb { name releaseDate }
+                    files { size }
+                }
+            }
+        }`;
+
+    let title = null;
+    let shotIndex = 0;
+    let slideTimer = null;
+    let descExpanded = false;
+    let slideToken = 0;
+
+    async function gqlFetch(query, variables) {
+        // GET, like the library grid: the endpoint ETags its responses, so a reload that
+        // changes nothing costs a 304.
+        const params = new URLSearchParams({query});
+        if (variables && Object.keys(variables).length) {
+            params.set('variables', JSON.stringify(variables));
+        }
+        const r = await fetch('/api/graphql?' + params.toString(), {
+            headers: {'Accept': 'application/json'},
+            credentials: 'same-origin',
+        });
+        if (!r.ok) throw new Error(`GraphQL HTTP ${r.status}`);
+        const body = await r.json();
+        if (body.errors && body.errors.length) {
+            throw new Error('GraphQL errors: ' + JSON.stringify(body.errors));
+        }
+        return body.data;
+    }
+
+    /** Titledb spells a title's date `20231020` and a version's `2023-10-20`. */
+    function formatDate(value) {
+        if (!value) return '';
+        const s = String(value);
+        if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}`;
+        return s.slice(0, 10);
+    }
+
+    // Names, descriptions, filenames and paths all come from titledb or the filesystem,
+    // so every interpolation below goes through this.
+    const esc = s => String(s === null || s === undefined ? '' : s)
+        .replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+    /** Label/value pairs for the rail, in titledb's own vocabulary. Anything the
+     *  catalogue leaves empty is dropped rather than shown as a blank row. */
+    function facts(t) {
+        const rows = [
+            ['Publisher', t.publisher, ''],
+            ['Developer', t.developer, ''],
+            ['Released', formatDate(t.releaseDate), ''],
+            ['Size', t.size ? formatBytes(t.size) : '', ''],
+            ['Players', t.numberOfPlayers, ''],
+            ['Category', (t.category || []).join(', '), ''],
+            ['Rating', t.rating, ''],
+            ['Content', (t.ratingContent || []).join(', '), ''],
+            ['Title ID', t.titleId, 'title-mono'],
+            ['NSU ID', t.nsuId, 'title-mono'],
+        ];
+        return rows.filter(([, value]) => value);
+    }
+
+    function headFragment(t) {
+        const byline = [formatDate(t.releaseDate), t.publisher].filter(Boolean).map(esc);
+        const icon = t.icon
+            ? `<img class="title-icon" src="${esc(t.icon.url)}" alt="">`
+            : `<div class="title-icon title-icon--empty"><i class="bi bi-controller"></i></div>`;
+        return `<div class="title-head">
+            ${icon}
+            <div class="title-head-text">
+                <h1 class="title-name">${esc(t.name || 'Unrecognized title')}</h1>
+                <p class="title-byline">${byline.join(' &middot; ')}${byline.length ? ' &middot; ' : ''}
+                    <span class="title-mono">${esc(t.titleId)}</span></p>
+            </div>
+        </div>`;
+    }
+
+    function factsFragment(t) {
+        return `<aside class="title-facts">${facts(t).map(([key, value, cls]) =>
+            `<div class="title-fact"><span class="title-fact-key">${key}</span>
+                <span class="title-fact-value ${cls}">${esc(value)}</span></div>`).join('')}</aside>`;
+    }
+
+    function aboutFragment(t) {
+        // Kept out of the nested template below so the translator can see it
+        const showMore = 'Show more';
+        return `<div class="title-about">
+            ${t.intro ? `<p class="title-intro">${esc(t.intro)}</p>` : ''}
+            ${t.description ? `<p class="title-desc is-clamped">${esc(t.description)}</p>
+                <button type="button" class="title-more" id="descToggle">${showMore}</button>` : ''}
+        </div>`;
+    }
+
+    /** A column of the page grid rather than a box inside the text, so its width is set
+     *  once, next to the panel's - and not by whatever the description happens to leave. */
+    function shotsFragment(t) {
+        // Indices, not urls: the slideshow, the dots and the viewer all step the same
+        // shared position through the list.
+        const shots = t.screenshots || [];
+        if (!shots.length) return '';
+        const dots = shots.map((shot, index) =>
+            `<button type="button" class="title-slide-dot" data-dot="${index}"
+                     aria-label="Screenshot ${index + 1}"></button>`).join('');
+        return `<div class="title-shots">
+            <div class="title-slideshow" data-open>
+                <img class="title-slide" alt="Screenshot">
+                <img class="title-slide" alt="Screenshot">
+                <button type="button" class="title-slide-nav title-slide-nav--prev" data-step="-1"
+                        aria-label="Previous screenshot"><i class="bi bi-chevron-left"></i></button>
+                <button type="button" class="title-slide-nav title-slide-nav--next" data-step="1"
+                        aria-label="Next screenshot"><i class="bi bi-chevron-right"></i></button>
+            </div>
+            <div class="title-slide-dots">${dots}</div>
+        </div>`;
+    }
+
+    /** Move the slideshow and the viewer to a screenshot, wrapping at either end. */
+    function showShot(index) {
+        const shots = (title && title.screenshots) || [];
+        if (!shots.length) return;
+        shotIndex = (index + shots.length) % shots.length;
+
+        crossfade(shots[shotIndex].url);
+        document.querySelectorAll('[data-dot]').forEach(dot => {
+            dot.classList.toggle('is-current', Number(dot.dataset.dot) === shotIndex);
+        });
+        // Loading it into the viewer as we go doubles as the preload for opening it.
+        const full = title.screenshotsFull || shots;
+        document.getElementById('shotImage').src = full[shotIndex].url;
+        document.getElementById('shotCount').textContent = `${shotIndex + 1} / ${shots.length}`;
+        document.querySelectorAll('.title-shot-nav, .title-slide-nav').forEach(button => {
+            button.hidden = shots.length < 2;
+        });
+    }
+
+    /** Crop the description to the room its row actually has - the facts panel and the
+     *  screenshots set that height, so a five-line clamp either cut text off with empty
+     *  space beside it or left the column short. Whole lines only, and no toggle at all
+     *  when the whole description already fits. */
+    function fitDescription() {
+        const desc = document.querySelector('.title-desc');
+        if (!desc) return;
+        const toggle = document.getElementById('descToggle');
+        const column = desc.parentElement;
+        const grid = column.parentElement;
+
+        // Called only while the text is collapsed, so start from the clamped state: a
+        // previous fit may have taken the class off when the column was wider.
+        desc.classList.add('is-clamped');
+        desc.style.webkitLineClamp = '';
+        toggle.hidden = false;
+        // Stacked on a narrow screen the column stands alone, so there is no neighbour
+        // height to match and the stylesheet's clamp is the answer. Only what shares the
+        // row counts: at middle widths the screenshots sit on their own row below.
+        const siblings = Array.from(grid.children).filter(child =>
+            child !== column && Math.abs(child.offsetTop - column.offsetTop) < 4);
+        const stacked = column.offsetWidth > grid.offsetWidth - 1;
+        const lineHeight = parseFloat(getComputedStyle(desc).lineHeight);
+        if (!stacked) {
+            // Everything but the text itself - intro, gaps, the toggle - is what the row
+            // owes the column, so the rest is the text's and the column ends level.
+            const spare = Math.max(...siblings.map(child => child.offsetHeight))
+                - (column.offsetHeight - desc.offsetHeight);
+            desc.style.webkitLineClamp = Math.max(3, Math.floor(spare / lineHeight));
+        }
+        // scrollHeight ignores the clamp, so it says what the text really needs.
+        const lines = parseInt(getComputedStyle(desc).webkitLineClamp, 10);
+        toggle.hidden = desc.scrollHeight <= lines * lineHeight + 1;
+        if (toggle.hidden) desc.classList.remove('is-clamped');
+    }
+
+    /** Bring the next screenshot up over the one on screen. Two stacked layers rather
+     *  than one image fading in: swapping the src of a single one shows a blank frame
+     *  while the new file decodes, which is the pop. Only the layer that has finished
+     *  decoding is ever brought forward. */
+    function crossfade(url) {
+        const layers = document.querySelectorAll('.title-slide');
+        if (!layers.length) return;
+        const front = document.querySelector('.title-slide.is-current');
+        const back = layers[0] === front ? layers[1] : layers[0];
+        // A stored image's url is page-relative, and `src` reads back absolute.
+        if (front && front.src === new URL(url, location.href).href) return;
+
+        const token = ++slideToken;
+        const bringForward = () => {
+            // A quick run through the dots leaves earlier loads in flight; they must not
+            // pull their layer back up once a later one has won.
+            if (token !== slideToken) return;
+            back.classList.add('is-current');
+            if (front) front.classList.remove('is-current');
+        };
+        back.src = url;
+        if (back.complete) bringForward();
+        else back.addEventListener('load', bringForward, {once: true});
+    }
+
+    /** The slideshow advances on its own, but never under the pointer or behind the viewer. */
+    function startSlideshow() {
+        clearInterval(slideTimer);
+        if (((title && title.screenshots) || []).length < 2) return;
+        slideTimer = setInterval(() => {
+            if (document.getElementById('shotModal').classList.contains('show')) return;
+            if (document.querySelector('.title-slideshow:hover')) return;
+            showShot(shotIndex + 1);
+        }, 5000);
+    }
+
+    /** One entry per app id, not per version: a title carries every update under a
+     *  single update app id, and a flat list would be dozens of rows of history. */
+    function groupApps(apps) {
+        const byId = new Map();
+        for (const app of apps) {
+            if (!byId.has(app.appId)) byId.set(app.appId, []);
+            byId.get(app.appId).push(app);
+        }
+        return [...byId.values()].map(versions => {
+            versions.sort((a, b) => b.appVersion - a.appVersion);
+            const latest = versions[0];
+            return {
+                appId: latest.appId,
+                appType: latest.appType,
+                name: (latest.titledb && latest.titledb.name) || null,
+                displayVersion: latest.displayVersion,
+                // BASE and DLC carry no release date of their own - theirs lives on the
+                // titledb row keyed by the app id. Only UPDATE rows date themselves.
+                releaseDate: (latest.titledb && latest.titledb.releaseDate)
+                    || latest.releaseDate,
+                versions,
+                owned: versions.some(v => v.owned),
+                // Null for anyone but an admin, so the size column stays empty.
+                files: versions.flatMap(v => v.files || []),
+            };
+        });
+    }
+
+    // One template drives the header and every row, so the columns line up across the
+    // base row and both groups even though they sit in different containers.
+    const CONTENT_COLUMNS = [
+        ['name', 'Content'], ['version', 'Version'], ['released', 'Released'],
+        ['status', 'Status'], ['size', 'Size'],
+    ];
+
+    function contentHeader() {
+        return `<div class="title-row title-row--head">${CONTENT_COLUMNS.map(
+            ([key, label]) => `<span class="title-col--${key}">${label}</span>`).join('')}</div>`;
+    }
+
+    /** `displayVersion` is the string the game shows about itself, read out of an owned
+     *  file's Control NCA - so a missing version has none, and no DLC ever does. An
+     *  empty cell is the honest answer rather than a dash. */
+    function contentRow({name, version, released, owned, files}) {
+        const size = (files || []).reduce((sum, f) => sum + Number(f.size || 0), 0);
+        return `<div class="title-row">
+            <span class="title-col--name">${name}</span>
+            <span class="title-col--version">${esc(version || '')}</span>
+            <span class="title-col--released">${formatDate(released)}</span>
+            <span class="title-col--status">${owned
+                ? '<span class="badge text-bg-success">Owned</span>'
+                : '<span class="badge border text-secondary">Missing</span>'}</span>
+            <span class="title-col--size">${size ? formatBytes(size) : ''}</span>
+        </div>`;
+    }
+
+    /** A counted group that opens. No `data-bs-parent`, so updates and DLC are
+     *  independent - opening one must not shut the other. */
+    function contentGroup(id, label, count, rowsHtml) {
+        if (!count) return '';
+        return `<div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#${id}">
+                    ${label}
+                    <span class="badge text-bg-secondary ms-auto me-2">${count}</span>
+                </button>
+            </h2>
+            <div id="${id}" class="accordion-collapse collapse">
+                <div class="accordion-body">${rowsHtml}</div>
+            </div>
+        </div>`;
+    }
+
+    /** The base game as one row, then updates and DLC as groups - the split the page
+     *  is actually read in, rather than a sortable table of every app row. */
+    function contentFragment(t) {
+        const groups = groupApps(t.apps || []);
+        const base = groups.find(group => group.appType === 'BASE');
+        const updates = groups.filter(group => group.appType === 'UPDATE')
+            .flatMap(group => group.versions)
+            .sort((a, b) => b.appVersion - a.appVersion);
+        const dlc = groups.filter(group => group.appType === 'DLC')
+            .sort((a, b) => (a.name || a.appId).localeCompare(b.name || b.appId));
+
+        const updateRows = updates.map(version => contentRow({
+            name: `v${version.appVersion}`, version: version.displayVersion,
+            released: version.releaseDate, owned: version.owned, files: version.files,
+        })).join('');
+        const dlcRows = dlc.map(group => contentRow({
+            name: esc(group.name || group.appId), version: group.displayVersion,
+            released: group.releaseDate, owned: group.owned, files: group.files,
+        })).join('');
+
+        return `<section class="title-content">
+            ${contentHeader()}
+            ${base ? contentRow({
+                name: 'Base Game', version: base.displayVersion,
+                released: base.releaseDate || t.releaseDate,
+                owned: base.owned, files: base.files,
+            }) : ''}
+            <div class="accordion accordion-flush">
+                ${contentGroup('contentUpdates', 'Updates', updates.length, updateRows)}
+                ${contentGroup('contentDlc', 'DLC', dlc.length, dlcRows)}
+            </div>
+        </section>`;
+    }
+
+    function render() {
+        const body = document.getElementById('titleBody');
+        if (!title) {
+            document.querySelector('.title-page').classList.add('title-page--nobanner');
+            body.innerHTML = `<div class="title-missing">
+                <h1>Title not found</h1>
+                <p class="text-secondary">Nothing in the library or the catalogue carries the id
+                    <span class="title-mono">${esc(TITLE_ID)}</span>.</p>
+                <a href="/" class="btn btn-primary">Back to the library</a>
+            </div>`;
+            return;
+        }
+
+        document.title = `${SHOP_NAME} | ${title.name || title.titleId}`;
+        if (title.banner) {
+            document.getElementById('titleBanner').style.backgroundImage = `url('${title.banner.url}')`;
+        } else {
+            document.querySelector('.title-page').classList.add('title-page--nobanner');
+        }
+
+        descExpanded = false;
+        const hasShots = (title.screenshots || []).length > 0;
+        body.innerHTML = headFragment(title)
+            + `<div class="title-grid${hasShots ? ' has-shots' : ''}">${factsFragment(title)}
+                ${aboutFragment(title)}${shotsFragment(title)}</div>`
+            + contentFragment(title);
+        showShot(0);
+        startSlideshow();
+        fitDescription();
+    }
+
+    async function loadTitle() {
+        try {
+            title = (await gqlFetch(TITLE_QUERY, {titleId: TITLE_ID})).title;
+        } catch (e) {
+            console.error(e);
+            document.getElementById('titleBody').innerHTML =
+                '<p class="text-danger">Could not load this title.</p>';
+            return;
+        }
+        render();
+    }
+
+    document.addEventListener('click', event => {
+        const step = event.target.closest('[data-step]');
+        if (step) {
+            showShot(shotIndex + Number(step.dataset.step));
+            return;
+        }
+
+        const dot = event.target.closest('[data-dot]');
+        if (dot) {
+            showShot(Number(dot.dataset.dot));
+            return;
+        }
+
+        if (event.target.closest('[data-open]')) {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('shotModal')).show();
+            return;
+        }
+
+        const toggle = event.target.closest('#descToggle');
+        if (toggle) {
+            const clamped = document.querySelector('.title-desc').classList.toggle('is-clamped');
+            toggle.textContent = clamped ? 'Show more' : 'Show less';
+            descExpanded = !clamped;
+            if (clamped) fitDescription();
+        }
+    });
+
+    // Bootstrap closes the viewer on Escape itself; the arrow keys are ours.
+    document.addEventListener('keydown', event => {
+        if (!document.getElementById('shotModal').classList.contains('show')) return;
+        if (event.key === 'ArrowRight') showShot(shotIndex + 1);
+        if (event.key === 'ArrowLeft') showShot(shotIndex - 1);
+    });
+
+    // The row the text has to match is a function of the width - but a reader who asked
+    // for the whole description keeps it.
+    window.addEventListener('resize', () => {
+        if (!descExpanded) fitDescription();
+    });
+
+    loadTitle();
+</script>
+
+<div class="modal fade" id="shotModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="title-lightbox">
+                <button type="button" class="title-shot-nav" data-step="-1"
+                        aria-label="Previous screenshot"><i class="bi bi-chevron-left"></i></button>
+                <img id="shotImage" class="img-fluid rounded" alt="Screenshot">
+                <button type="button" class="title-shot-nav" data-step="1"
+                        aria-label="Next screenshot"><i class="bi bi-chevron-right"></i></button>
+            </div>
+            <p class="title-shot-count" id="shotCount"></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

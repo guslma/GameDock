@@ -1,0 +1,1721 @@
+{% extends "settings_layout.html" %}
+{% block panel %}
+            <div class="settings-container container-xxl px-3 px-lg-4 py-4">
+
+                <h1 class="gd-page-title">Settings</h1>
+                <p class="gd-page-lead">Everything that changes how GameDock works, by topic.</p>
+
+                {% if admin_account_created == false %}
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">Missing admin account!</h4>
+                    <p class="mb-0">Until an account with admin rights is created, <strong>anyone can open and change this configuration</strong>. <a href="#users" class="alert-link">Add one in the Users tab</a>.</p>
+                </div>
+                {% endif %}
+
+                <div id="missingKeysAlert" class="alert alert-warning alert-dismissible fade show d-none" role="alert">
+                    <h4 class="alert-heading">Missing / invalid console keys file!</h4>
+                    <p class="mb-0">Without your console keys GameDock only recognizes files named with [TITLEID][vVERSION] and cannot verify them.</p>
+                    <p class="mb-0"><a target="_blank" rel="noopener" href="https://gitea.com/KudbiOdd/easy-switch-hacking-shise/wiki/Dump-device-keys" class="alert-link">How to extract the keys from your console</a> · <a href="#consoleKeysInputLabel" class="alert-link">Send the keys file</a></p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <ul class="nav gd-tabs" id="settingsTabs" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-shop" data-bs-toggle="tab" data-bs-target="#pane-shop" type="button" role="tab" aria-controls="pane-shop" aria-selected="true" data-hash="shop">Shop</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-library" data-bs-toggle="tab" data-bs-target="#pane-library" type="button" role="tab" aria-controls="pane-library" aria-selected="false" data-hash="library">Library</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-users" data-bs-toggle="tab" data-bs-target="#pane-users" type="button" role="tab" aria-controls="pane-users" aria-selected="false" data-hash="users">Users</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-maintenance" data-bs-toggle="tab" data-bs-target="#pane-maintenance" type="button" role="tab" aria-controls="pane-maintenance" aria-selected="false" data-hash="maintenance">Automatic maintenance</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-advanced" data-bs-toggle="tab" data-bs-target="#pane-advanced" type="button" role="tab" aria-controls="pane-advanced" aria-selected="false" data-hash="advanced">Advanced</button></li>
+                </ul>
+
+                <div class="tab-content">
+
+                <!-- ===================== SHOP ===================== -->
+                <div class="tab-pane fade show active" id="pane-shop" role="tabpanel" aria-labelledby="tab-shop" tabindex="0">
+                    <section class="gd-card">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="shopNameInput" class="form-label">Shop name</label>
+                                <input class="form-control" id="shopNameInput" aria-describedby="shopNameHelp" placeholder="GameDock">
+                                <div id="shopNameHelp" class="form-text">Shown on the console and at the top of this page.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="shopMotdTextArea" class="form-label">Welcome message</label>
+                                <textarea class="form-control" id="shopMotdTextArea" rows="1"></textarea>
+                                <div id="shopMotdTextAreaHelp" class="form-text">Shown on the console when the shop opens.</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>Access from outside home</h2>
+                        <p class="gd-lead">Optional. To download games from anywhere over the internet. Needs a reverse proxy, a tunnel (such as Cloudflare Tunnel) or the port opened on the router.</p>
+                        <label for="shopHostInput" class="form-label">Remote address</label>
+                        <input class="form-control" id="shopHostInput" aria-describedby="shopHostHelp" placeholder="shop.domain.tld" style="max-width: 520px">
+                        <div id="shopHostHelp" class="form-text">The console only accepts the shop when it answers on this address, so nobody else can use your shop through it.</div>
+                        <div class="form-text">With https, the proxy must not accept plain http and must send the X-Forwarded-Proto header.</div>
+                        <div id="missingShopHostAlert" class="form-text" style="display: none;">No remote address yet: the shop works only on your home network.</div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>Access</h2>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="discoveryEnabledCheck">
+                                <span class="gd-setting-title">Find on the home network</span>
+                                <span class="gd-setting-help">The console finds the server by itself, without typing the address. With Docker it needs the host network.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="discoveryEnabledCheck"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="publicShopCheck">
+                                <span class="gd-setting-title">Open shop, no password</span>
+                                <span class="gd-setting-help">Anyone on your network can download. Leave it off if you are not sure.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="publicShopCheck"></div>
+                        </div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>Console apps allowed to use the shop</h2>
+                        <p class="gd-lead">Turn off the ones you do not use.</p>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="sphairaEnabledCheck"><span class="gd-setting-title">Sphaira</span></label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="sphairaEnabledCheck"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="tinfoilEnabledCheck"><span class="gd-setting-title">Tinfoil</span></label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="tinfoilEnabledCheck"></div>
+                        </div>
+                        <div class="gd-setting gd-sub">
+                            <label class="gd-setting-text" for="tinfoilEncryptShopCheck">
+                                <span class="gd-setting-title">Protect the shop for Tinfoil</span>
+                                <span class="gd-setting-help">Encrypts the list so only Tinfoil can read it. Recommended.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="tinfoilEncryptShopCheck"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="cyberfoilEnabledCheck"><span class="gd-setting-title">CyberFoil</span></label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="cyberfoilEnabledCheck"></div>
+                        </div>
+                    </section>
+
+                    <div class="gd-save-bar">
+                        <span class="gd-saved" aria-live="polite"></span>
+                        <button type="button" class="btn btn-primary px-4" onclick="saveTab(this, ['submitShopSettings', 'submitServicesSettings'])">Save</button>
+                        <button type="button" id="submitShopSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                        <button type="button" id="submitServicesSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                    </div>
+                </div>
+
+                <!-- ===================== LIBRARY ===================== -->
+                <div class="tab-pane fade" id="pane-library" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
+                    <section class="gd-card">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <h2 class="me-auto mb-0">Folders with games</h2>
+                            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseNewPath" aria-expanded="false" aria-controls="collapseNewPath">Add folder</button>
+                            <button type="button" class="btn btn-outline-secondary scanBtn" onClick='scanLibrary()'>Look for new files</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="pathsTable">
+                                <thead><tr><th scope="col">Path</th><th scope="col">Actions</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="alert alert-danger d-none mt-2" id="pathsAlert" role="alert"></div>
+                        <div class="collapse" id="collapseNewPath">
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <label for="libraryPathInput" class="visually-hidden">Path</label>
+                                <input type="text" class="form-control" id="libraryPathInput" placeholder="Path" style="max-width: 420px">
+                                <button type="button" id="submitNewLibraryPathBtn" class="btn btn-primary" onClick='submitNewLibraryPath()'>Add</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Delete path modal -->
+                    <div class="modal fade" id="deletePathModal" tabindex="-1" aria-labelledby="deletePathModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h1 class="modal-title fs-5" id="deletePathModalLabel">Delete library path</h1>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">...</div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <section class="gd-card">
+                        <h2 id="consoleKeysInputLabel">Console keys</h2>
+                        <p class="gd-lead">Needed to recognize and verify the games, whatever their file names. It is the prod.keys file extracted from your Switch.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="consoleKeysInput" class="form-label">Send a keys file</label>
+                                <input class="form-control" type="file" accept=".keys,.txt" id="consoleKeysInput">
+                                <div id="consoleKeysFeedback"></div>
+                                <div id="consoleKeysHelp" class="form-text">The file is sent as soon as you pick it.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="keysAlert" class="form-label">Master key revisions</label>
+                                <div id="keysAlert" class="alert alert-secondary py-2 mb-0"><p id="keysMissingLabel" class="mb-0"></p></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>Game names and descriptions</h2>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="selectRegion" class="form-label">Catalogue region</label>
+                                <select id="selectRegion" class="form-select" aria-label="Select library region"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="selectLanguage" class="form-label">Language</label>
+                                <select id="selectLanguage" class="form-select" aria-label="Select library language"></select>
+                            </div>
+                        </div>
+                        <div id="selectRegionLanguageHelp" class="form-text">Used for the names, descriptions and artwork of the games.</div>
+                    </section>
+
+                    <section class="gd-card">
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="watcherEnabledCheck">
+                                <span class="gd-setting-title">Notice new files by itself</span>
+                                <span class="gd-setting-help">When you copy a game to a folder, it joins the library right away.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="watcherEnabledCheck"></div>
+                        </div>
+                        <div class="gd-setting gd-sub flex-wrap">
+                            <label class="gd-setting-text" for="watcherIntervalInput">
+                                <span class="gd-setting-title">Check network folders every</span>
+                                <span class="gd-setting-help">Only for folders on a network share (SMB, NFS), which do not report changes.</span>
+                            </label>
+                            <div>
+                                <div class="input-group" style="width: 150px">
+                                    <input type="number" min="1" class="form-control" id="watcherIntervalInput">
+                                    <span class="input-group-text">s</span>
+                                </div>
+                                <div id="watcherIntervalFeedback"></div>
+                            </div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="localMediaEnabledCheck">
+                                <span class="gd-setting-title">Keep the artwork on the server</span>
+                                <span class="gd-setting-help">The console gets the images from here and never connects to Nintendo's servers.
+                                    <a class="link-secondary" data-bs-toggle="collapse" href="#mediaUsage" role="button" aria-expanded="false" aria-controls="mediaUsage">Disk usage</a></span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="localMediaEnabledCheck"></div>
+                        </div>
+                        <div class="collapse" id="mediaUsage">
+                            <div class="table-responsive">
+                                <table class="table table-hover caption-top mb-0" id="mediaUsageTable">
+                                    <caption id="mediaUsageCaption"></caption>
+                                    <thead><tr><th scope="col">Type</th><th scope="col">Original</th><th scope="col">Client</th><th scope="col">Total</th></tr></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="gd-save-bar">
+                        <span class="gd-saved" aria-live="polite"></span>
+                        <button type="button" class="btn btn-primary px-4" onclick="saveTab(this, ['submitTitlesSettings', 'submitWatcherSettings', 'submitLocalMediaSettings'])">Save</button>
+                        <button type="button" id="submitTitlesSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                        <button type="button" id="submitWatcherSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                        <button type="button" id="submitLocalMediaSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                    </div>
+                </div>
+
+                <!-- ===================== USERS ===================== -->
+                <div class="tab-pane fade" id="pane-users" role="tabpanel" aria-labelledby="tab-users" tabindex="0">
+                    <section class="gd-card">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <p class="gd-lead mb-0 me-auto">Who can use the shop on the console and who can change things here in Admin.</p>
+                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseNewUser" aria-expanded="false" aria-controls="collapseNewUser">Add user</button>
+                        </div>
+                        <div class="collapse" id="collapseNewUser">
+                            <form class="row g-3 align-items-center py-3">
+                                <div class="col-sm-auto">
+                                    <label for="inputNewUser" class="visually-hidden">Username</label>
+                                    <input type="text" class="form-control" id="inputNewUser" placeholder="Username" autocomplete="off">
+                                </div>
+                                <div class="col-sm-auto">
+                                    <label for="inputNewUserPassword" class="visually-hidden">Password</label>
+                                    <input type="password" class="form-control" id="inputNewUserPassword" placeholder="Password" autocomplete="new-password">
+                                </div>
+                                <div class="col-sm-auto">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="checkboxNewUserShopAccess" checked>
+                                        <label class="form-check-label" for="checkboxNewUserShopAccess">Shop Access</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="checkboxNewUserBackupAccess">
+                                        <label class="form-check-label" for="checkboxNewUserBackupAccess">Backup Access</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="checkboxNewUserAdminAccess">
+                                        <label class="form-check-label" for="checkboxNewUserAdminAccess">Admin Access</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-auto">
+                                    <button type="button" class="btn btn-primary" onClick='submitNewUser()'>Create user</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="userTable">
+                                <thead><tr><th scope="col">User</th><th scope="col">Permissions</th><th scope="col">Actions</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>What each permission allows</h2>
+                        <ul class="mb-0 text-body-secondary">
+                            <li><strong>Shop</strong>: see and download games from the console (Sphaira, Tinfoil, CyberFoil).</li>
+                            <li><strong>Backup</strong>: send files from the console to the server.</li>
+                            <li><strong>Admin</strong>: everything, including this Admin area.</li>
+                        </ul>
+                    </section>
+
+                    <!-- Delete User Modal -->
+                    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h1 class="modal-title fs-5" id="deleteUserModalLabel">Delete user</h1>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">...</div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <!-- Edit User Modal (GameDock) -->
+                <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel"
+                    aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h1 class="modal-title fs-5" id="editUserModalLabel">Edit user</h1>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="inputEditUser" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="inputEditUser" autocomplete="off">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="inputEditUserPassword" class="form-label">New password</label>
+                                    <input type="password" class="form-control" id="inputEditUserPassword"
+                                        autocomplete="new-password" placeholder="Leave blank to keep the current password">
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="checkboxEditUserShopAccess">
+                                    <label class="form-check-label" for="checkboxEditUserShopAccess">Shop Access</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="checkboxEditUserBackupAccess">
+                                    <label class="form-check-label" for="checkboxEditUserBackupAccess">Backup Access</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="checkboxEditUserAdminAccess">
+                                    <label class="form-check-label" for="checkboxEditUserAdminAccess">Admin Access</label>
+                                </div>
+                                <div class="alert alert-warning mt-3 mb-0 d-none" id="editUserError"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-primary" onclick="saveEditUser()">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- ===================== AUTOMATIC MAINTENANCE ===================== -->
+                <div class="tab-pane fade" id="pane-maintenance" role="tabpanel" aria-labelledby="tab-maintenance" tabindex="0">
+                    <p class="gd-page-lead">What GameDock does by itself with the files once they join the library.</p>
+                    <section class="gd-card">
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="verifyFilesCheck">
+                                <span class="gd-setting-title">Check that files are intact</span>
+                                <span class="gd-setting-help">Warns when a game came corrupted or modified. Needs the console keys.
+                                    <a class="setting-stat d-none" id="verificationStat" href="/admin/files#verification"></a></span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="verifyFilesCheck"></div>
+                        </div>
+                        <div class="gd-setting gd-sub flex-wrap">
+                            <span class="gd-setting-text"><span class="gd-setting-title">How to check</span></span>
+                            <div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="verificationDepth" id="verificationDepthHash" value="hash">
+                                    <label class="form-check-label" for="verificationDepthHash">Complete: checks every byte (recommended)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="verificationDepth" id="verificationDepthSignature" value="signature">
+                                    <label class="form-check-label" for="verificationDepthSignature">Quick: only Nintendo's signature</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning d-none mt-2" id="verificationKeysAlert" role="alert">Verification is disabled: no valid console keys are loaded.</div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="organizerEnabledCheck">
+                                <span class="gd-setting-title">Organize folders and names</span>
+                                <span class="gd-setting-help">Puts each game in its own folder with a standard name, following the name templates below.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="organizerEnabledCheck"></div>
+                        </div>
+                        <div class="gd-setting gd-sub">
+                            <label class="gd-setting-text" for="removeEmptyFoldersCheck">
+                                <span class="gd-setting-title">Remove empty folders</span>
+                                <span class="gd-setting-help">After organizing, deletes the folders left with nothing.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="removeEmptyFoldersCheck"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="compressFilesCheck">
+                                <span class="gd-setting-title">Compress to NSZ</span>
+                                <span class="gd-setting-help">Saves around 30% of space (NSP becomes NSZ, XCI becomes XCZ). The original is only deleted after the compressed file is checked.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="compressFilesCheck"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="deleteOlderUpdatesCheck">
+                                <span class="gd-setting-title">Delete old updates</span>
+                                <span class="gd-setting-help">When a new update arrives, removes the previous one of the same game.
+                                    <a class="setting-stat d-none" id="outdatedStat" href="/admin/files#outdated"></a></span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="deleteOlderUpdatesCheck"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="deleteDuplicatesCheck">
+                                <span class="gd-setting-title">Delete repeated copies</span>
+                                <span class="gd-setting-help">If the same content is there twice, keeps the best copy (intact, then compressed, then organized), once all were checked. Files recognized only by name are never deleted.
+                                    <a class="setting-stat d-none" id="duplicatesStat" href="/admin/files#duplicates"></a></span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="deleteDuplicatesCheck"></div>
+                        </div>
+                        <div class="gd-setting gd-sub">
+                            <label class="gd-setting-text" for="preferMulticontentCheck">
+                                <span class="gd-setting-title">Prefer files that bundle game, update and DLC together</span>
+                                <span class="gd-setting-help">Also applies to downloads.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="preferMulticontentCheck"></div>
+                        </div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>Compression</h2>
+                        <p class="gd-lead">Used when "Compress to NSZ" is on. The defaults are already a good balance.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6 col-xl-3">
+                                <label class="form-label" for="compressionLevelInput">Level</label>
+                                <input type="number" min="1" max="22" class="form-control" id="compressionLevelInput">
+                                <div class="form-text">1 to 22. Higher = smaller file, but slower. Default: 18.</div>
+                            </div>
+                            <div class="col-md-6 col-xl-3">
+                                <label for="compressModeSelect" class="form-label">Format</label>
+                                <select class="form-select" id="compressModeSelect">
+                                    <option value="auto">Automatic (default)</option>
+                                    <option value="solid">Solid: smallest file</option>
+                                    <option value="block">Blocks: opens without decompressing everything</option>
+                                </select>
+                                <div class="form-text">Automatic uses solid for NSP and blocks for XCI.</div>
+                            </div>
+                            <div class="col-md-6 col-xl-3">
+                                <label for="compressBlockSizeInput" class="form-label">Block size</label>
+                                <select class="form-select" id="compressBlockSizeInput">
+                                    <option value="14">16 KB</option>
+                                    <option value="15">32 KB</option>
+                                    <option value="16">64 KB</option>
+                                    <option value="17">128 KB</option>
+                                    <option value="18">256 KB</option>
+                                    <option value="19">512 KB</option>
+                                    <option value="20">1 MB (default)</option>
+                                    <option value="21">2 MB</option>
+                                    <option value="22">4 MB</option>
+                                    <option value="23">8 MB</option>
+                                </select>
+                                <div class="form-text">Only for the blocks format.</div>
+                            </div>
+                            <div class="col-md-6 col-xl-3">
+                                <label for="compressThreadsInput" class="form-label">Processor cores per file</label>
+                                <input type="number" class="form-control" min="0" max="64" id="compressThreadsInput">
+                                <div class="form-text">0 = automatic. Fewer cores keep the server freer while compressing.</div>
+                            </div>
+                        </div>
+                        <div class="gd-setting mt-2">
+                            <label class="gd-setting-text" for="compressLongDistanceCheck">
+                                <span class="gd-setting-title">Extra compression for large files</span>
+                                <span class="gd-setting-help">Compresses large games a little more, using more memory.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="compressLongDistanceCheck"></div>
+                        </div>
+                    </section>
+
+                    <details class="gd-card gd-details">
+                        <summary>File name templates (for those who want to customize)</summary>
+                        <p class="form-text mt-2">Used by "Organize folders and names". Paths are relative to the library folder and the extension is added automatically. Keep [{appId}][v{appVersion}] in the names so Tinfoil recognizes the games.</p>
+                        <div class="row g-3">
+                            <div class="col-lg-6"><label for="baseTemplateInput" class="form-label">Game</label><input type="text" class="form-control form-control-code" id="baseTemplateInput"></div>
+                            <div class="col-lg-6"><label for="updateTemplateInput" class="form-label">Update</label><input type="text" class="form-control form-control-code" id="updateTemplateInput"></div>
+                            <div class="col-lg-6"><label for="dlcTemplateInput" class="form-label">DLC</label><input type="text" class="form-control form-control-code" id="dlcTemplateInput"></div>
+                            <div class="col-lg-6"><label for="multiTemplateInput" class="form-label">File with several contents</label><input type="text" class="form-control form-control-code" id="multiTemplateInput"></div>
+                        </div>
+                        <p class="form-text mt-3 mb-0">Fields: {titleName} game name, {titleId} game ID, {appName} game or DLC name, {appId} content ID, {appVersion} version, {patchLevel} patch level, {extension} extension.</p>
+                    </details>
+
+                    <div class="gd-save-bar">
+                        <span class="gd-saved" aria-live="polite"></span>
+                        <button type="button" class="btn btn-primary px-4" onclick="saveTab(this, ['submitLibraryManagementSettings'])">Save</button>
+                        <button type="button" id="submitLibraryManagementSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                    </div>
+                </div>
+
+                <!-- ===================== ADVANCED ===================== -->
+                <div class="tab-pane fade" id="pane-advanced" role="tabpanel" aria-labelledby="tab-advanced" tabindex="0">
+                    <div class="alert alert-info d-flex gap-2" role="note">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        <span>You usually do not need to change anything here. The defaults work for almost everyone.</span>
+                    </div>
+                    <section class="gd-card">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="titledbUpdateIntervalInput" class="form-label">Update the game catalogue every</label>
+                                <input type="text" class="form-control" id="titledbUpdateIntervalInput" aria-describedby="titledbUpdateIntervalHelp" placeholder="12h">
+                                <div id="titledbUpdateIntervalFeedback"></div>
+                                <div id="titledbUpdateIntervalHelp" class="form-text">A number and a unit, like 30m, 12h or 1d. 0 turns it off.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="workerCountInput" class="form-label">Worker processes</label>
+                                <input type="number" class="form-control" id="workerCountInput" min="1" step="1">
+                                <div id="workerCountFeedback"></div>
+                                <div id="workerCountHelp" class="form-text">How many background tasks run at the same time.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="ioLimitInput" class="form-label">Disk tasks at the same time</label>
+                                <input type="number" class="form-control" id="ioLimitInput" min="1" step="1">
+                                <div id="ioLimitFeedback"></div>
+                                <div id="ioLimitHelp" class="form-text">Compressing and checking read whole files. Hard drive or network share: 1. SATA SSD: 2 or 3. NVMe: up to the number of cores.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="netLimitInput" class="form-label">Artwork downloads at the same time</label>
+                                <input type="number" class="form-control" id="netLimitInput" min="1" step="1">
+                                <div id="netLimitFeedback"></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="gd-card">
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="windowsCompatibleCheck">
+                                <span class="gd-setting-title">Windows compatible file names</span>
+                                <span class="gd-setting-help">Turn on if the games folder is shared with Windows (SMB, NFS).</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="windowsCompatibleCheck"></div>
+                        </div>
+                    </section>
+
+                    <div class="gd-save-bar">
+                        <span class="gd-saved" aria-live="polite"></span>
+                        <button type="button" class="btn btn-primary px-4" onclick="saveTab(this, ['submitSchedulerSettings', 'submitWorkerSettings', 'submitLibraryManagementSettings'])">Save</button>
+                        <button type="button" id="submitSchedulerSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                        <button type="button" id="submitWorkerSettingsBtn" class="d-none" tabindex="-1" aria-hidden="true"></button>
+                    </div>
+                </div>
+
+                </div>
+            </div>
+{% endblock %}
+
+{% block panel_scripts %}
+<script>
+    // Tabs: the address keeps the open tab (#shop, #library...), so a reload or a link
+    // like /admin/settings#shopHostInput opens the right one
+    function showSettingsTab(hash) {
+        const name = (hash || '').replace('#', '');
+        if (!name) return;
+        let button = document.querySelector('#settingsTabs [data-hash="' + name + '"]');
+        if (!button) {
+            const target = document.getElementById(name);
+            const pane = target && target.closest('.tab-pane');
+            button = pane && document.querySelector('#settingsTabs [data-bs-target="#' + pane.id + '"]');
+        }
+        if (button) bootstrap.Tab.getOrCreateInstance(button).show();
+    }
+    document.querySelectorAll('#settingsTabs [data-bs-toggle="tab"]').forEach(button => {
+        button.addEventListener('shown.bs.tab', () => history.replaceState(null, '', '#' + button.dataset.hash));
+    });
+    showSettingsTab(location.hash);
+    window.addEventListener('hashchange', () => showSettingsTab(location.hash));
+
+    // One Save per tab: runs the save of every section in it and reports once all answered
+    function saveTab(button, saves) {
+        const bar = button.closest('.gd-save-bar');
+        const status = bar.querySelector('.gd-saved');
+        const pane = button.closest('.tab-pane');
+        button.disabled = true;
+        status.textContent = '';
+        $(document).one('ajaxStop', () => {
+            button.disabled = false;
+            const invalid = pane.querySelector('.is-invalid');
+            status.textContent = invalid ? 'Check the highlighted fields.' : 'Settings saved.';
+            status.style.color = invalid ? 'var(--gd-warn)' : '';
+            if (invalid) invalid.scrollIntoView({block: 'center'});
+            setTimeout(() => { status.textContent = ''; }, 5000);
+        });
+        saves.forEach(name => window[name]());
+    }
+
+    // Find on the home network (it had its own Services page before)
+    function submitServicesSettings() {
+        $('#submitServicesSettingsBtn').prop('disabled', true);
+        $.ajax({
+            url: "/api/settings/services",
+            type: 'POST',
+            data: JSON.stringify({discovery: {enabled: $('#discoveryEnabledCheck').is(":checked")}}),
+            contentType: "application/json",
+            complete: function () {
+                $('#submitServicesSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+    $.getJSON("/api/settings", function (result) {
+        $('#discoveryEnabledCheck').prop('checked', result['services']['discovery']['enabled']);
+    });
+</script>
+
+<script src="{{ url_for('static', filename='js/format.js') }}"></script>
+<script>
+
+    settings_map = {
+        'library/path': 'libraryPathInput'
+    };
+
+
+    // allUsers = [];
+
+    function getInputVal(inputId) {
+        return $("#" + inputId).val();
+    };
+
+    function setInputVal(inputId, value) {
+        return $("#" + inputId).val(value);
+    };
+
+    function getCheckboxStatus(checkboxId) {
+        return $('#' + checkboxId).is(":checked")
+    }
+
+    // Scans one library, or every configured one when path is null.
+    const SCAN_MUTATION = `
+        mutation Scan($path: String) {
+            scanLibrary(path: $path) { id status }
+        }`;
+
+    /** Bring the setting the URL names into view and focus its control - a label's input, or
+     *  the control itself. The fields fill in from several requests, each moving the layout,
+     *  so it is kept centred while they land. */
+    function focusHashTarget() {
+        const target = location.hash.length > 1 && document.getElementById(location.hash.slice(1));
+        if (!target) return;
+        const control = target.matches('input, select, textarea, button') ? target
+            : target.htmlFor ? document.getElementById(target.htmlFor) : null;
+        const block = (control || target).closest('.form-check, .mb-3') || target;
+        const centre = () => block.scrollIntoView({block: 'center'});
+        centre();
+        if (control) control.focus({preventScroll: true});
+        const settling = new ResizeObserver(centre);
+        settling.observe(document.body);
+        setTimeout(() => settling.disconnect(), 1500);
+    }
+
+    window.addEventListener('hashchange', focusHashTarget);
+
+    const VERIFICATION_ISSUES = ['SIGNATURE_FAILED', 'MODIFIED', 'CORRUPT', 'UNVERIFIED'];
+
+    /** Beside each toggle that acts on library files, what it would act on now, linking to
+     *  the Files page view listing it. The same figures as that page's tiles, fetched on
+     *  their own since ranking every copy is not free. */
+    async function loadFileStats() {
+        let stats;
+        try {
+            const query = `{ stats { duplicates { files size } outdatedUpdates { files size }
+                                     filesByVerificationStatus { status count } } }`;
+            const r = await fetch('/api/graphql?' + new URLSearchParams({query: query}),
+                                  {headers: {'Accept': 'application/json'}, credentials: 'same-origin'});
+            stats = (await r.json()).data.stats;
+        } catch (e) { return; }
+        const show = (id, count, text, none) => $(id).text(count ? text : none).toggleClass('setting-stat-none', !count)
+                                                     .removeClass('d-none');
+        const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+        if (stats.outdatedUpdates) {
+            const {files, size} = stats.outdatedUpdates;
+            show('#outdatedStat', files, `${plural(files, 'outdated update')} · ${formatBytes(size)}`, 'No outdated updates');
+        }
+        if (stats.duplicates) {
+            const {files, size} = stats.duplicates;
+            show('#duplicatesStat', files, `${plural(files, 'duplicate')} · ${formatBytes(size)}`, 'No duplicates');
+        }
+        if (stats.filesByVerificationStatus) {
+            const issues = stats.filesByVerificationStatus.filter(b => VERIFICATION_ISSUES.includes(b.status))
+                                                          .reduce((n, b) => n + b.count, 0);
+            show('#verificationStat', issues, plural(issues, 'verification issue'), 'No verification issues');
+        }
+    }
+
+    loadFileStats();
+
+    async function scanLibrary(path = null) {
+        $('.scanBtn').prop('disabled', true);
+        try {
+            const r = await fetch('/api/graphql', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                credentials: 'same-origin',
+                body: JSON.stringify({query: SCAN_MUTATION, variables: {path: path}}),
+            });
+            if (!r.ok) throw new Error(`GraphQL HTTP ${r.status}`);
+            const body = await r.json();
+            if (body.errors && body.errors.length) {
+                throw new Error('GraphQL errors: ' + JSON.stringify(body.errors));
+            }
+            console.log('Scan enqueued:', body.data.scanLibrary);
+            showPathsError(null);
+        } catch (e) {
+            console.error(e);
+            showPathsError('Could not start scan: ' + e.message);
+        } finally {
+            $('.scanBtn').prop('disabled', false);
+        }
+    }
+
+    // Shows API `errors` (or a plain message) above the paths table; falsy clears it.
+    function showPathsError(errors) {
+        const text = Array.isArray(errors) ? errors.map(e => e.error || e).join(' ') : errors;
+        $('#pathsAlert').text(text || '').toggleClass('d-none', !text);
+    }
+
+    function fillLibraryTable() {
+        $('#pathsTable tbody').empty();
+
+        $.getJSON("/api/settings/library/paths", function (result) {
+
+            if (!result['success']) {
+                if (result['status_code'] == '302') {
+                    window.location.href = result['location']
+                    return
+                }
+            }
+            paths = result.paths;
+            if (paths === null || !paths.length) {
+                $('#pathsTable tbody').append(
+                    '<tr><td>-</td><td>-</td><td>');
+            } else {
+                paths.forEach(path => {
+                    // The path is set with .text()/.attr(): concatenating it into markup, or into an
+                    // inline handler, makes the browser eat backslashes in Windows paths (issue #297).
+                    const scanBtn = $('<button type="button" class="btn btn-outline-info btn-sm scanBtn"><i class="bi bi-arrow-clockwise"></i></button>').attr('data-bs-path', path);
+                    const deleteBtn = $('<button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deletePathModal"><i class="bi bi-x-circle"></i></button>').attr('data-bs-path', path);
+                    $('#pathsTable tbody').append(
+                        $('<tr>').append($('<td>').text(path), $('<td>').append(scanBtn, ' ', deleteBtn)));
+                })
+            }
+            const watcher = result.watcher || { enabled: true, polling_interval: 60 };
+            $('#watcherEnabledCheck').prop('checked', watcher.enabled);
+            $('#watcherIntervalInput').val(watcher.polling_interval);
+        });
+
+    }
+
+    function submitWatcherSettings() {
+        $('#submitWatcherSettingsBtn').prop('disabled', true);
+        data = {
+            enabled: getCheckboxStatus("watcherEnabledCheck"),
+            polling_interval: parseInt($('#watcherIntervalInput').val(), 10)
+        }
+        $.ajax({
+            url: "/api/settings/library/watcher",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (!result['success']) {
+                    if (result['errors']) {
+                        result['errors'].forEach(error => {
+                            $('#watcherIntervalFeedback').text(error['error']);
+                            $('#watcherIntervalFeedback').addClass('invalid-feedback d-block');
+                            $("#watcherIntervalInput").removeClass('is-valid').addClass('is-invalid');
+                        });
+                    }
+                } else {
+                    $('#watcherIntervalFeedback').text('').removeClass('invalid-feedback d-block');
+                    $("#watcherIntervalInput").removeClass('is-invalid').addClass('is-valid');
+                }
+                $('#submitWatcherSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    // Artwork kinds in the order they are shown, labelled for the usage table.
+    const MEDIA_KINDS = { icon: 'Icon', banner: 'Banner', screenshot: 'Screenshots' };
+
+    // Renditions in the order they are shown, one column each ahead of the total.
+    const MEDIA_SIZES = ['original', 'thumb', 'client', 'screen'];
+
+    function usageRow(label, bytes, bold) {
+        const row = $(bold ? '<tr class="fw-semibold">' : '<tr>');
+        const total = bytes.reduce((sum, used) => sum + used, 0);
+        return row.append($('<td>').text(label), ...bytes.map(used => $('<td>').text(formatBytes(used))),
+            $('<td>').text(formatBytes(total)));
+    }
+
+    function fillMediaUsage() {
+        $.getJSON("/api/settings/local_media/usage", function (usage) {
+            const rows = [];
+            const totals = MEDIA_SIZES.map(() => 0);
+            let files = 0;
+            Object.entries(MEDIA_KINDS).forEach(([kind, label]) => {
+                const bytes = MEDIA_SIZES.map((size, i) => {
+                    const used = ((usage[kind] || {})[size]) || { bytes: 0, files: 0 };
+                    files += used.files;
+                    totals[i] += used.bytes;
+                    return used.bytes;
+                });
+                rows.push(usageRow(label, bytes, false));
+            });
+            rows.push(usageRow('Total', totals, true));
+            $('#mediaUsageTable tbody').empty().append(rows);
+            $('#mediaUsageCaption').text(`${files} file${files === 1 ? '' : 's'} stored`);
+        });
+    }
+
+    function submitLocalMediaSettings() {
+        $('#submitLocalMediaSettingsBtn').prop('disabled', true);
+        $.ajax({
+            url: "/api/settings/local_media",
+            type: 'POST',
+            data: JSON.stringify({ enabled: getCheckboxStatus("localMediaEnabledCheck") }),
+            contentType: "application/json",
+            success: function (result) {
+                if ($('#mediaUsage').hasClass('show')) {
+                    fillMediaUsage();
+                }
+                $('#submitLocalMediaSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function fillUserTable() {
+        $('#userTable tbody').empty();
+        $.getJSON("/api/users", function (result) {
+            if (!result['success']) {
+                if (result['status_code'] == '302') {
+                    window.location.href = result['location']
+                    return
+                }
+            }
+            allUsers = result;
+            allUsernames = [];
+            if (!result.length) {
+                $('#userTable tbody').append(
+                    '<tr><td>-</td><td>-</td><td>-</td></tr>');
+            }
+            result.forEach(user => {
+                allUsernames.push(user['user']);
+                base_input = '<input class="form-check-input" type="checkbox" onclick="return false" checked>';
+                shop_input = base_input;
+                backup_input = base_input;
+                admin_input = base_input;
+                if (!user['shop_access']) {
+                    shop_input = shop_input.replace(' checked', '');
+                }
+                if (!user['backup_access']) {
+                    backup_input = backup_input.replace(' checked', '');
+                }
+                if (!user['admin_access']) {
+                    admin_input = shop_input.replace(' checked', '');
+                }
+                $('#userTable tbody').append(
+                    '<tr><td>' + user['user'] + '</td><td>'
+                    + `
+                        <div class="form-check form-check-inline">`
+                    + shop_input + `
+                            <label class="form-check-label">Shop</label>
+                        </div>
+                        <div class="form-check form-check-inline">`
+                    + backup_input + `
+                            <label class="form-check-label">Backup</label>
+                        </div>
+                        <div class="form-check form-check-inline">`
+                    + admin_input + `
+                            <label class="form-check-label">Admin</label>
+                        </div>`
+                    + '</td><td>' +
+                    '<button type="button" class="btn btn-outline-info btn-sm" onclick="openEditUser(' + user['id'] + ')"><i class="bi bi-pencil-square" title="Edit user"></i></button> ' +
+                    '<button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteUserModal" data-bs-id="' + user['id'] + '" data-bs-user="' + user['user'] + '"\'><i class="bi bi-x-circle"></i></button>' +
+                    '</td></tr>');
+            });
+        })
+
+    }
+
+    function updateKeysElements(titlesSettings) {
+        // Verification cannot run without keys: nstools needs them to open a container.
+        const validKeys = Boolean(titlesSettings['valid_keys']);
+        $('#verifyFilesCheck, #verificationDepthSignature, #verificationDepthHash').prop('disabled', !validKeys);
+        $('#verificationKeysAlert').toggleClass('d-none', validKeys);
+
+        // Keys alert
+        if (titlesSettings['valid_keys']) {
+            $('#consoleKeysFeedback').text("Keys are valid!");
+            $('#consoleKeysFeedback').removeClass('invalid-feedback');
+            $('#consoleKeysFeedback').addClass('valid-feedback d-block');
+            $('#missingKeysAlert').removeClass('d-block');
+            $('#missingKeysAlert').addClass('d-none');
+        } else {
+            $('#consoleKeysFeedback').removeClass('valid-feedback');
+            $('#consoleKeysFeedback').addClass('invalid-feedback d-block');
+            $('#missingKeysAlert').removeClass('d-none');
+            $("#missingKeysAlert").addClass('d-block');
+            if (titlesSettings['valid_keys'] === null) {
+                $('#consoleKeysFeedback').text("Missing keys file! Use the button above to upload a new file.");
+            } else {
+                $('#consoleKeysFeedback').text("Invalid keys file! At least one master key is incorrect. Use the button above to upload a new file.");
+            }
+        }
+
+        // Missing and invalid master key revisions
+        if (titlesSettings['valid_keys'] === null) {
+            $('#keysAlert').css("border-color", "var(--bs-danger-border-subtle)");
+            $("#keysMissingLabel").text("Missing console keys file.");
+        } else if ((titlesSettings['missing_keys'] && titlesSettings['missing_keys'].length > 0) || (titlesSettings['corrupt_keys'] && titlesSettings['corrupt_keys'].length > 0)) {
+            $('#keysAlert').css("border-color", "var(--bs-warning-border-subtle)");
+            $("#keysMissingLabel").text("Missing/invalid master key revisions:");
+            $("#keysMissingLabel").next('ul').remove(); // Clear existing ul if any
+            var ul = $('<ul class="mb-0">');
+            if (titlesSettings['corrupt_keys'] && titlesSettings['corrupt_keys'].length > 0) {
+                $.each(titlesSettings['corrupt_keys'], function(index, key) {
+                    ul.append($('<li>').html('<code>' + key + '</code> is invalid'));
+                });
+            }
+            if (titlesSettings['missing_keys'] && titlesSettings['missing_keys'].length > 0) {
+                $.each(titlesSettings['missing_keys'], function(index, key) {
+                    ul.append($('<li>').html('<code>' + key + '</code> is missing'));
+                });
+            }
+            $("#keysMissingLabel").after(ul);
+        } else {
+            $('#keysAlert').css("border-color", "var(--bs-form-valid-border-color)");
+            $("#keysMissingLabel").text("All master key revisions are present and valid.");
+        }
+    }
+
+    // Row buttons carry their path in data-bs-path, read back as a string rather than
+    // re-parsed as markup or JS.
+    $('#pathsTable').on('click', '.scanBtn', function () {
+        scanLibrary($(this).attr('data-bs-path'))
+    })
+
+    const deletePathModal = $('#deletePathModal')
+    if (deletePathModal) {
+        deletePathModal.on('show.bs.modal', event => {
+            const path = event.relatedTarget.getAttribute('data-bs-path')
+            deletePathModal.data('path', path)
+            deletePathModal.find('.modal-body').text("Delete path " + path + " ?")
+        })
+        deletePathModal.find('.btn-danger').on('click', () => deleteLibraryPath(deletePathModal.data('path')))
+    }
+
+    const deleteUserModal = $('#deleteUserModal')
+    if (deleteUserModal) {
+        deleteUserModal.on('show.bs.modal', event => {
+            // Button that triggered the modal
+            const button = event.relatedTarget
+            // Extract info from data-bs-* attributes
+            const user = button.getAttribute('data-bs-user')
+            const id = button.getAttribute('data-bs-id')
+            // If necessary, you could initiate an Ajax request here
+            // and then do the updating in a callback.
+
+            // Update the modal's content.
+            // const modalTitle = deleteUserModal.querySelector('.modal-title')
+            const modalBody = deleteUserModal.find('.modal-body')
+            const deleteBtn = deleteUserModal.find('.btn-danger')
+
+
+            deleteBtn.attr('onClick', 'deleteUser(' + id + ');');
+
+            // modalTitle.textContent = `New message to ${recipient}`
+            modalBody.text("Delete user " + user + " ?")
+        })
+    }
+
+    function deleteUser(userId) {
+        data = {
+            user_id: userId
+        }
+        $.ajax({
+            url: "/api/user",
+            type: 'DELETE',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (result['success']) {
+                    fillUserTable();
+                }
+            }
+        });
+    }
+
+    function deleteLibraryPath(path) {
+        data = {
+            path: path
+        }
+        $.ajax({
+            url: "/api/settings/library/paths",
+            type: 'DELETE',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                showPathsError(result['success'] ? null : result['errors']);
+                if (result['success']) {
+                    fillLibraryTable();
+                }
+            },
+            error: function (xhr) {
+                showPathsError('Could not delete path: HTTP ' + xhr.status + '.');
+            }
+        });
+    }
+
+    $('#checkboxNewUserAdminAccess').change(function () {
+        if (this.checked != false) {
+            $('#checkboxNewUserShopAccess').prop('checked', true).attr("disabled", true);
+            $('#checkboxNewUserBackupAccess').prop('checked', true).attr("disabled", true);
+
+        } else {
+            $('#checkboxNewUserShopAccess').attr("disabled", false);
+            $('#checkboxNewUserBackupAccess').attr("disabled", false);
+
+        }
+    });
+
+    function validatePassword(password) {
+        if (!password) {
+            return {
+                isValid: false,
+                message: "Password cannot be empty"
+            };
+        }
+        
+        // Check for control characters (null, line breaks, etc.)
+        const controlChars = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
+        if (controlChars.test(password)) {
+            return {
+                isValid: false,
+                message: "Password contains invalid control characters"
+            };
+        }
+        
+        // Also check for tab, newline, and carriage return explicitly
+        if (password.includes('\t') || password.includes('\n') || password.includes('\r')) {
+            return {
+                isValid: false,
+                message: "Password contains invalid control characters"
+            };
+        }
+        
+        // Check for Tinfoil forbidden characters
+        const tinfoilForbidden = /[@&/?#=]/;
+        if (tinfoilForbidden.test(password)) {
+            return {
+                isValid: false,
+                message: "Password contains invalid characters. Please avoid: @ & / ? # ="
+            };
+        }
+        
+        // Check for UTF-8 encoding validity
+        try {
+            // Try to encode as UTF-8
+            new TextEncoder().encode(password);
+        } catch (e) {
+            return {
+                isValid: false,
+                message: "Password contains invalid UTF-8 characters"
+            };
+        }
+        
+        return { isValid: true, message: "" };
+    }
+
+    function validateUsername(username) {
+        if (!username) {
+            return {
+                isValid: false,
+                message: "Username cannot be empty"
+            };
+        }
+        
+        // Check for colons (not allowed in Basic Auth usernames)
+        if (username.includes(':')) {
+            return {
+                isValid: false,
+                message: "Username cannot contain colons (:)"
+            };
+        }
+        
+        // Check for control characters (null, line breaks, etc.)
+        const controlChars = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
+        if (controlChars.test(username)) {
+            return {
+                isValid: false,
+                message: "Username contains invalid control characters"
+            };
+        }
+        
+        // Also check for tab, newline, and carriage return explicitly
+        if (username.includes('\t') || username.includes('\n') || username.includes('\r')) {
+            return {
+                isValid: false,
+                message: "Username contains invalid control characters"
+            };
+        }
+        
+        // Check for UTF-8 encoding validity
+        try {
+            // Try to encode as UTF-8
+            new TextEncoder().encode(username);
+        } catch (e) {
+            return {
+                isValid: false,
+                message: "Username contains invalid UTF-8 characters"
+            };
+        }
+        
+        return { isValid: true, message: "" };
+    }
+
+    function showPasswordError(message) {
+        $('#inputNewUserPassword').addClass('is-invalid');
+        let errorDiv = $('#inputNewUserPassword').siblings('.invalid-feedback');
+        if (errorDiv.length === 0) {
+            errorDiv = $('<div class="invalid-feedback"></div>');
+            $('#inputNewUserPassword').after(errorDiv);
+        }
+        errorDiv.text(message);
+    }
+
+    function clearPasswordError() {
+        $('#inputNewUserPassword').removeClass('is-invalid');
+        $('#inputNewUserPassword').siblings('.invalid-feedback').remove();
+    }
+
+    function showUsernameError(message) {
+        $('#inputNewUser').addClass('is-invalid');
+        let errorDiv = $('#inputNewUser').siblings('.invalid-feedback');
+        if (errorDiv.length === 0) {
+            errorDiv = $('<div class="invalid-feedback"></div>');
+            $('#inputNewUser').after(errorDiv);
+        }
+        errorDiv.text(message);
+    }
+
+    function clearUsernameError() {
+        $('#inputNewUser').removeClass('is-invalid');
+        $('#inputNewUser').siblings('.invalid-feedback').remove();
+    }
+
+    // GameDock: edit an existing user
+    let editingUserId = null;
+    const EDIT_USER_ERRORS = {
+        not_found: 'This user no longer exists.',
+        environment_user: 'This user is set by the USER_ADMIN or USER_GUEST variables of the container, which recreate it at every start. Change it there.',
+        user_exists: 'User already exists',
+        last_admin: 'Keep at least one admin account.',
+    };
+
+    function openEditUser(id) {
+        const user = (allUsers || []).find(u => u.id === id);
+        if (!user) {
+            return;
+        }
+        editingUserId = id;
+        $('#inputEditUser').val(user.user);
+        $('#inputEditUserPassword').val('');
+        $('#checkboxEditUserShopAccess').prop('checked', !!user.shop_access);
+        $('#checkboxEditUserBackupAccess').prop('checked', !!user.backup_access);
+        $('#checkboxEditUserAdminAccess').prop('checked', !!user.admin_access);
+        syncEditUserAccess();
+        $('#editUserError').addClass('d-none').text('');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editUserModal')).show();
+    }
+
+    // Admins always have shop and backup access, as in the new user form
+    function syncEditUserAccess() {
+        const admin = $('#checkboxEditUserAdminAccess').prop('checked');
+        if (admin) {
+            $('#checkboxEditUserShopAccess').prop('checked', true);
+            $('#checkboxEditUserBackupAccess').prop('checked', true);
+        }
+        $('#checkboxEditUserShopAccess').prop('disabled', admin);
+        $('#checkboxEditUserBackupAccess').prop('disabled', admin);
+    }
+    $('#checkboxEditUserAdminAccess').change(syncEditUserAccess);
+
+    function showEditUserError(message) {
+        $('#editUserError').removeClass('d-none').text(message);
+    }
+
+    function saveEditUser() {
+        const user = $('#inputEditUser').val().trim();
+        const password = $('#inputEditUserPassword').val();
+        const usernameValidation = validateUsername(user);
+        if (!usernameValidation.isValid) {
+            showEditUserError(usernameValidation.message);
+            return;
+        }
+        if (allUsers.some(u => u.user === user && u.id !== editingUserId)) {
+            showEditUserError('User already exists');
+            return;
+        }
+        if (password) {
+            const passwordValidation = validatePassword(password);
+            if (!passwordValidation.isValid) {
+                showEditUserError(passwordValidation.message);
+                return;
+            }
+        }
+        $.ajax({
+            url: '/api/user/update',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                user_id: editingUserId,
+                user: user,
+                password: password,
+                shop_access: $('#checkboxEditUserShopAccess').prop('checked'),
+                backup_access: $('#checkboxEditUserBackupAccess').prop('checked'),
+                admin_access: $('#checkboxEditUserAdminAccess').prop('checked'),
+            }),
+            success: function (result) {
+                if (result.success) {
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('editUserModal')).hide();
+                    fillUserTable();
+                } else {
+                    showEditUserError(EDIT_USER_ERRORS[result.error] || result.message || result.error);
+                }
+            },
+            error: function () {
+                showEditUserError('Could not save the user. Please try again.');
+            }
+        });
+    }
+
+    function submitNewUser() {
+        formOk = true;
+        user = getInputVal("inputNewUser")
+        password = getInputVal("inputNewUserPassword")
+        shop_access = getCheckboxStatus("checkboxNewUserShopAccess")
+        backup_access = getCheckboxStatus("checkboxNewUserBackupAccess")
+        admin_access = getCheckboxStatus("checkboxNewUserAdminAccess")
+
+        // Validate username
+        const usernameValidation = validateUsername(user);
+        if (!usernameValidation.isValid) {
+            showUsernameError(usernameValidation.message);
+            formOk = false;
+        } else if (allUsernames.includes(user)) {
+            showUsernameError('User already exists');
+            formOk = false;
+        } else {
+            clearUsernameError();
+        }
+
+        // Validate password
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            showPasswordError(passwordValidation.message);
+            formOk = false;
+        } else {
+            clearPasswordError();
+        }
+
+
+        if (formOk) {
+            data = {
+                user: user,
+                password: password,
+                shop_access: shop_access,
+                backup_access: backup_access,
+                admin_access: admin_access,
+            }
+
+            $.ajax({
+                url: "/api/user/signup",
+                type: 'POST',
+                data: JSON.stringify(data),
+                contentType: "application/json",
+                success: function (result) {
+                    if (result['success']) {
+                        if (result['status_code'] == '302') {
+                            window.location.href = result['location']
+                            return
+                        }
+                        console.log('Signup Success!');
+                        setInputVal("inputNewUser", "")
+                        setInputVal("inputNewUserPassword", "")
+                        fillUserTable();
+                    } else {
+                        // Handle backend validation errors
+                        if (result['error']) {
+                            $('#inputNewUserPassword').addClass('is-invalid');
+                            let errorDiv = $('#inputNewUserPassword').siblings('.invalid-feedback');
+                            if (errorDiv.length === 0) {
+                                errorDiv = $('<div class="invalid-feedback"></div>');
+                                $('#inputNewUserPassword').after(errorDiv);
+                            }
+                            errorDiv.text(result['error']);
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error creating user:', error);
+                    $('#inputNewUserPassword').addClass('is-invalid');
+                    let errorDiv = $('#inputNewUserPassword').siblings('.invalid-feedback');
+                    if (errorDiv.length === 0) {
+                        errorDiv = $('<div class="invalid-feedback"></div>');
+                        $('#inputNewUserPassword').after(errorDiv);
+                    }
+                    errorDiv.text('Error creating user. Please try again.');
+                }
+            });
+        }
+    }
+
+    function submitNewLibraryPath() {
+        $('#submitNewLibraryPathBtn').prop('disabled', true);
+        path = getInputVal("libraryPathInput").trim();
+        data = {
+            path: path
+        }
+
+        $.ajax({
+            url: "/api/settings/library/paths",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (result['success']) {
+                    if (result['status_code'] == '302') {
+                        window.location.href = result['location']
+                        return
+                    }
+                    console.log('Sucessfully added path ' + path);
+                    setInputVal("libraryPathInput", "")
+                    showPathsError(null);
+                    fillLibraryTable();
+                } else {
+                    showPathsError(result['errors']);
+                }
+                $('#submitNewLibraryPathBtn').prop('disabled', false);
+            },
+            error: function (xhr) {
+                showPathsError('Could not add path: HTTP ' + xhr.status + '.');
+                $('#submitNewLibraryPathBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function submitTitlesSettings() {
+        $('#submitTitlesSettingsBtn').prop('disabled', true);
+        data = {
+            region: getInputVal("selectRegion"),
+            language: getInputVal("selectLanguage"),
+        }
+        file = $('#consoleKeysInput').prop('files')[0];
+
+        if (file != undefined) {
+            formData = new FormData();
+            formData.append("file", file);
+            $.ajax({
+                url: "/api/upload",
+                type: 'POST',
+                data: formData,
+                cache: false,
+                contentType: false,
+                processData: false,
+                success: function (result) {
+                    if (result['success']) {
+                        updateKeysElements(result['data']);
+                        $('#consoleKeysInput').val('');
+                    } else {
+                        errors = result['errors'].join(';')
+                        $('#consoleKeysFeedback').text("Failed to upload keys file: " + errors);
+                        $('#consoleKeysFeedback').addClass('invalid-feedback d-block');
+                    }
+                }
+            });
+        }
+
+        $.ajax({
+            url: "/api/settings/titles",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (!result['success']) {
+                    console.log('Not Success!');
+                    result['errors'].forEach(error => {
+                        path = error['path'];
+                        formId = settings_map[path];
+                        form = $('#' + formId);
+                        form.addClass('is-invalid');
+                        formTextElement = form.attr('aria-describedby');
+                        $("#" + formTextElement).addClass('invalid-feedback');
+                        $("#" + formTextElement).text(error['error']);
+                    });
+                }
+                $('#consoleKeysInput').val('');
+                $('#submitTitlesSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function submitShopSettings() {
+        $('#submitShopSettingsBtn').prop('disabled', true);
+        data = {
+            name: $('#shopNameInput').val(),
+            host: $('#shopHostInput').val(),
+            public: getCheckboxStatus("publicShopCheck"),
+            motd: $('#shopMotdTextArea').val(),
+            clients: {
+                cyberfoil: {
+                    enabled: getCheckboxStatus("cyberfoilEnabledCheck"),
+                },
+                tinfoil: {
+                    enabled: getCheckboxStatus("tinfoilEnabledCheck"),
+                    encrypt: getCheckboxStatus("tinfoilEncryptShopCheck"),
+                },
+                sphaira: {
+                    enabled: getCheckboxStatus("sphairaEnabledCheck"),
+                }
+            }
+        }
+
+        $.ajax({
+            url: "/api/settings/shop",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (!result['success']) {
+                    console.log('Not Success!');
+                    result['errors'].forEach(error => {
+                        path = error['path'];
+                        formId = settings_map[path];
+                        form = $('#' + formId);
+                        form.addClass('is-invalid');
+                        formTextElement = form.attr('aria-describedby');
+                        $("#" + formTextElement).addClass('invalid-feedback');
+                        $("#" + formTextElement).text(error['error']);
+                    });
+                }
+                $('#submitShopSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function submitLibraryManagementSettings() {
+        $('#submitLibraryManagementSettingsBtn').prop('disabled', true);
+        data = {
+            compression: {
+                enabled: getCheckboxStatus("compressFilesCheck"),
+                level: parseInt(getInputVal("compressionLevelInput")),
+                long_distance: getCheckboxStatus("compressLongDistanceCheck"),
+                mode: getInputVal("compressModeSelect"),
+                block_size_exponent: parseInt(getInputVal("compressBlockSizeInput")),
+                threads: parseInt(getInputVal("compressThreadsInput"))
+            },
+            verification: {
+                enabled: getCheckboxStatus("verifyFilesCheck"),
+                depth: $("input[name='verificationDepth']:checked").val() || "signature"
+            },
+            delete_older_updates: getCheckboxStatus("deleteOlderUpdatesCheck"),
+            deduplication: {
+                enabled: getCheckboxStatus("deleteDuplicatesCheck"),
+                prefer_multicontent: getCheckboxStatus("preferMulticontentCheck")
+            },
+            organizer: {
+                enabled: getCheckboxStatus("organizerEnabledCheck"),
+                remove_empty_folders: getCheckboxStatus("removeEmptyFoldersCheck"),
+                windows_compatible: getCheckboxStatus("windowsCompatibleCheck"),
+                templates: {
+                    base: getInputVal("baseTemplateInput"),
+                    update: getInputVal("updateTemplateInput"),
+                    dlc: getInputVal("dlcTemplateInput"),
+                    multi: getInputVal("multiTemplateInput")
+                }
+            }
+        }
+
+        $.ajax({
+            url: "/api/settings/library/management",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (!result['success']) {
+                    console.log('Not Success!');
+                }
+                $('#submitLibraryManagementSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function submitSchedulerSettings() {
+        $('#submitSchedulerSettingsBtn').prop('disabled', true);
+        data = {
+            titledb_update_interval: getInputVal("titledbUpdateIntervalInput").trim()
+        }
+
+        $.ajax({
+            url: "/api/settings/scheduler",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (!result['success']) {
+                    console.log('Not Success!');
+                    if (result['errors']) {
+                        result['errors'].forEach(error => {
+                            if (error['path'] === 'scheduler/titledb_update_interval') {
+                                $('#titledbUpdateIntervalFeedback').text(error['error']);
+                                $('#titledbUpdateIntervalFeedback').addClass('invalid-feedback d-block');
+                                $("#titledbUpdateIntervalInput").removeClass('is-valid');
+                                $("#titledbUpdateIntervalInput").addClass('is-invalid');
+                            }
+                            console.log('Path:', error['path']);
+                            console.log('Error:', error['error']);
+                        });
+                    }
+                } else {
+                    console.log('Scheduler settings updated successfully!');
+                    $('#titledbUpdateIntervalFeedback').text('');
+                    $('#titledbUpdateIntervalFeedback').removeClass('invalid-feedback d-block');
+                    $("#titledbUpdateIntervalInput").removeClass('is-invalid');
+                    $("#titledbUpdateIntervalInput").addClass('is-valid');
+                }
+                $('#submitSchedulerSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function submitWorkerSettings() {
+        $('#submitWorkerSettingsBtn').prop('disabled', true);
+        data = {
+            count: parseInt($('#workerCountInput').val()),
+            group_limits: {
+                io: parseInt($('#ioLimitInput').val()),
+                net: parseInt($('#netLimitInput').val())
+            }
+        }
+
+        $.ajax({
+            url: "/api/settings/worker",
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (result) {
+                if (!result['success']) {
+                    if (result['errors']) {
+                        result['errors'].forEach(error => {
+                            if (error['path'] === 'worker/count') {
+                                $('#workerCountFeedback').text(error['error']);
+                                $('#workerCountFeedback').addClass('invalid-feedback d-block');
+                                $("#workerCountInput").removeClass('is-valid');
+                                $("#workerCountInput").addClass('is-invalid');
+                            } else if (error['path'] === 'worker/group_limits/io') {
+                                $('#ioLimitFeedback').text(error['error']);
+                                $('#ioLimitFeedback').addClass('invalid-feedback d-block');
+                                $("#ioLimitInput").removeClass('is-valid');
+                                $("#ioLimitInput").addClass('is-invalid');
+                            } else if (error['path'] === 'worker/group_limits/net') {
+                                $('#netLimitFeedback').text(error['error']);
+                                $('#netLimitFeedback').addClass('invalid-feedback d-block');
+                                $("#netLimitInput").removeClass('is-valid');
+                                $("#netLimitInput").addClass('is-invalid');
+                            }
+                        });
+                    }
+                } else {
+                    $('#workerCountFeedback').text('');
+                    $('#workerCountFeedback').removeClass('invalid-feedback d-block');
+                    $("#workerCountInput").removeClass('is-invalid');
+                    $("#workerCountInput").addClass('is-valid');
+                    $('#ioLimitFeedback').text('');
+                    $('#ioLimitFeedback').removeClass('invalid-feedback d-block');
+                    $("#ioLimitInput").removeClass('is-invalid');
+                    $("#ioLimitInput").addClass('is-valid');
+                    $('#netLimitFeedback').text('');
+                    $('#netLimitFeedback').removeClass('invalid-feedback d-block');
+                    $("#netLimitInput").removeClass('is-invalid');
+                    $("#netLimitInput").addClass('is-valid');
+                }
+                $('#submitWorkerSettingsBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    $(document).ready(function () {
+        fillUserTable();
+        fillLibraryTable();
+        // The figures are a live scan of the store, so they are read when asked for rather
+        // than on every settings page load.
+        $('#mediaUsage').on('show.bs.collapse', fillMediaUsage);
+
+        // Add real-time password validation
+        $('#inputNewUserPassword').on('input', function() {
+            const password = $(this).val();
+            const validation = validatePassword(password);
+            if (!validation.isValid) {
+                showPasswordError(validation.message);
+            } else {
+                clearPasswordError();
+            }
+        });
+
+        // Add real-time username validation
+        $('#inputNewUser').on('input', function() {
+            const username = $(this).val();
+            const validation = validateUsername(username);
+            if (!validation.isValid) {
+                showUsernameError(validation.message);
+            } else if (allUsernames.includes(username)) {
+                showUsernameError('User already exists');
+            } else {
+                clearUsernameError();
+            }
+        });
+
+        $.getJSON("/api/settings", function (result) {
+            languages = {{ languages_from_titledb | tojson | safe }};
+            Object.keys(languages).forEach(function (key) {
+                $('#selectRegion').append(`<option value="${key}">${key}</option>`);
+            });
+
+            $('#selectRegion').on('change', function () {
+                $('#selectLanguage').empty()
+                region = $(this).find(":selected").val();
+                availableLanguages = languages[region] || [];
+                availableLanguages.forEach(function (key) {
+                    $('#selectLanguage').append(`<option value="${key}">${key}</option>`);
+                });
+            });
+
+            // Library settings
+            librarySettings = result['library'];
+            // Populate library management settings
+            const compression = librarySettings['management']['compression'];
+            $("#compressFilesCheck").prop("checked", compression['enabled']);
+            setInputVal("compressionLevelInput", compression['level']);
+            $("#compressLongDistanceCheck").prop("checked", compression['long_distance']);
+            setInputVal("compressModeSelect", compression['mode']);
+            setInputVal("compressBlockSizeInput", compression['block_size_exponent']);
+            setInputVal("compressThreadsInput", compression['threads']);
+            const verification = librarySettings['management']['verification'];
+            $("#verifyFilesCheck").prop("checked", verification['enabled']);
+            $("input[name='verificationDepth'][value='" + verification['depth'] + "']").prop("checked", true);
+            $("#deleteOlderUpdatesCheck").prop("checked", librarySettings['management']['delete_older_updates']);
+            const deduplication = librarySettings['management']['deduplication'];
+            $("#deleteDuplicatesCheck").prop("checked", deduplication['enabled']);
+            $("#preferMulticontentCheck").prop("checked", deduplication['prefer_multicontent']);
+            $("#organizerEnabledCheck").prop("checked", librarySettings['management']['organizer']['enabled']);
+            $("#removeEmptyFoldersCheck").prop("checked", librarySettings['management']['organizer']['remove_empty_folders']);
+            $("#windowsCompatibleCheck").prop("checked", librarySettings['management']['organizer']['windows_compatible']);
+            setInputVal("baseTemplateInput", librarySettings['management']['organizer']['templates']['base']);
+            setInputVal("updateTemplateInput", librarySettings['management']['organizer']['templates']['update']);
+            setInputVal("dlcTemplateInput", librarySettings['management']['organizer']['templates']['dlc']);
+            setInputVal("multiTemplateInput", librarySettings['management']['organizer']['templates']['multi']);
+
+            // Titles settings
+            titlesSettings = result['titles'];
+            updateKeysElements(titlesSettings);
+
+            // Fill region and language
+            setInputVal("selectRegion", titlesSettings['region']);
+            $('#selectRegion').trigger('change');
+            setInputVal("selectLanguage", titlesSettings['language']);
+
+            // Local media settings
+            $("#localMediaEnabledCheck").prop("checked", result['local_media']['enabled']);
+
+            // Scheduler settings
+            schedulerSettings = result['scheduler'];
+            if (schedulerSettings && schedulerSettings['titledb_update_interval'] !== undefined) {
+                setInputVal("titledbUpdateIntervalInput", schedulerSettings['titledb_update_interval']);
+            }
+
+            // Worker settings
+            workerSettings = result['worker'];
+            if (workerSettings && workerSettings['count'] !== undefined) {
+                $('#workerCountInput').val(workerSettings['count']);
+            }
+            if (workerSettings && workerSettings['group_limits']) {
+                if (workerSettings['group_limits']['io'] !== undefined) {
+                    $('#ioLimitInput').val(workerSettings['group_limits']['io']);
+                }
+                if (workerSettings['group_limits']['net'] !== undefined) {
+                    $('#netLimitInput').val(workerSettings['group_limits']['net']);
+                }
+            }
+
+            // Shop settings
+            shopSettings = result['shop'];
+            setInputVal("shopNameInput", shopSettings['name']);
+            setInputVal("shopHostInput", shopSettings['host']);
+            $("#publicShopCheck").prop("checked", shopSettings['public']);
+            setInputVal("shopMotdTextArea", shopSettings['motd']);
+
+            // Check for missing shop host
+            if (!shopSettings['host']) {
+                $("#missingShopHostAlert").css('display', '');
+            }
+            
+            // Client-specific settings
+            if (shopSettings['clients']) {
+                if (shopSettings['clients']['tinfoil']) {
+                    tinfoilSettings = shopSettings['clients']['tinfoil'];
+                    $("#tinfoilEnabledCheck").prop("checked", tinfoilSettings['enabled']);
+                    $("#tinfoilEncryptShopCheck").prop("checked", tinfoilSettings['encrypt']);
+                }
+                if (shopSettings['clients']['sphaira']) {
+                    sphairaSettings = shopSettings['clients']['sphaira'];
+                    $("#sphairaEnabledCheck").prop("checked", sphairaSettings['enabled']);
+                }
+                if (shopSettings['clients']['cyberfoil']) {
+                    cyberfoilSettings = shopSettings['clients']['cyberfoil'];
+                    $("#cyberfoilEnabledCheck").prop("checked", cyberfoilSettings['enabled']);
+                }
+            }
+            focusHashTarget();
+        });
+
+    });
+    {% if admin_account_created == false %}
+    $('#checkboxNewUserAdminAccess').prop('checked', true).attr("disabled", true);
+    $('#checkboxNewUserShopAccess').prop('checked', true).attr("disabled", true);
+    $('#checkboxNewUserBackupAccess').prop('checked', true).attr("disabled", true);
+    {% endif %}
+</script>
+
+{% endblock %}

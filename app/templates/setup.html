@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% set username = current_user.user if current_user.is_authenticated else 'Username' %}
+{% set local_url = 'http://' ~ local_address ~ ':' ~ local_port if local_address else '' %}
+{% include 'nav.html' %}
+<div class="container-xxl px-3 px-lg-4 py-4">
+    <h1 class="gd-page-title">Connect your console</h1>
+    <p class="gd-page-lead">Pick the app you use on the Switch and follow the steps. It takes a couple of minutes.</p>
+
+    <div class="row g-3 mb-2">
+        {% if show_local_tab %}
+        <div class="col-lg-6">
+            <section class="gd-card gd-address h-100 mb-0">
+                <div class="gd-address-text">
+                    {% if local_address %}
+                    <div class="gd-address-label">At home <span class="gd-pill gd-pill-ok">Working</span></div>
+                    <div class="gd-address-value" id="localAddress">{{ local_url }}</div>
+                    <div class="form-text">Console and server on the same network (home Wi-Fi).</div>
+                    {% else %}
+                    <div class="gd-address-label">At home</div>
+                    <div class="form-text">Unable to determine local server address. Please check your network configuration.</div>
+                    {% endif %}
+                </div>
+                {% if local_address %}
+                <button type="button" class="btn btn-primary" onclick="copyText('{{ local_url }}', this)">Copy</button>
+                {% endif %}
+            </section>
+        </div>
+        {% endif %}
+        <div class="col-lg-6">
+            <section class="gd-card gd-address h-100 mb-0">
+                <div class="gd-address-text">
+                    {% if remote_host %}
+                    <div class="gd-address-label">Away from home <span class="gd-pill gd-pill-ok">Configured</span></div>
+                    <div class="gd-address-value">https://{{ remote_host }}</div>
+                    <div class="form-text">To download from anywhere over the internet.</div>
+                    {% else %}
+                    <div class="gd-address-label">Away from home <span class="gd-pill gd-pill-muted">Not configured</span></div>
+                    <div class="gd-address-value text-secondary">No remote address</div>
+                    <div class="form-text">To download from anywhere over the internet.</div>
+                    {% endif %}
+                </div>
+                {% if remote_host %}
+                <button type="button" class="btn btn-primary" onclick="copyText('https://{{ remote_host }}', this)">Copy</button>
+                {% elif is_admin %}
+                <a class="btn btn-outline-secondary" href="/admin/settings#shopHostInput">Set up</a>
+                {% endif %}
+            </section>
+        </div>
+    </div>
+    <p class="form-text mb-4">
+        {% if shop_public %}<span>The shop is open: no username or password needed.</span>
+        {% elif admin_account_created %}<span>Username and password: the same ones you use here.</span>{% if current_user.is_authenticated %} (<code>{{ current_user.user }}</code>){% endif %}
+        {% endif %}
+        {% if local_address and remote_host %}<br><span>Sphaira uses the home address on your network and the remote one elsewhere.</span>{% endif %}
+    </p>
+
+    <div class="gd-clients">
+        <!-- Sphaira: browses the library by game -->
+        <section class="gd-card">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h2 class="h5 mb-0">Sphaira</h2>
+                <span class="gd-pill gd-pill-ok">Recommended</span>
+            </div>
+            <p class="form-text mt-0 mb-3">Browses the library by game and downloads only what is missing. Downloads resume after a dropped connection.</p>
+            {% if show_local_tab and discovery_enabled %}
+            <ol class="gd-steps">
+                <li>Connect the Switch to the same network as this server.</li>
+                <li>In <strong>Sphaira</strong>, open <strong>(Y) Menu</strong> → <strong>Menus</strong> → <strong>Ownfoil</strong>.</li>
+                <li>Pick <strong>Discover local servers</strong>, then <code>{{ shop_name }}</code>.</li>
+                {% if admin_account_created and not shop_public %}<li>Accept the login prompt, enter your username and password and press <strong>Save</strong>.</li>{% endif %}
+            </ol>
+            <p class="form-text mt-3 mb-2">If it does not show up, add it by hand:</p>
+            {% elif show_local_tab and is_admin %}
+            <div class="alert alert-secondary py-2">Turn on <a href="/admin/settings#discoveryEnabledCheck" class="alert-link">Find on the home network</a> and Sphaira finds the server by itself.</div>
+            {% endif %}
+            <ol class="gd-steps">
+                <li>In <strong>Sphaira</strong>, open <strong>(Y) Menu</strong> → <strong>Menus</strong> → <strong>Ownfoil</strong>.</li>
+                <li>Open <strong>(X) Options</strong> → <strong>Add server</strong> and fill in:
+                    <table class="gd-kv">
+                        <tr><td>Name</td><td><code>{{ shop_name }}</code></td></tr>
+                        {% if local_address %}<tr><td>Local address</td><td><code>{{ local_address }}:{{ local_port }}</code></td></tr>{% endif %}
+                        {% if remote_host %}<tr><td>Remote address</td><td><code>{{ remote_host }}</code></td></tr>{% endif %}
+                        {% if admin_account_created and not shop_public %}<tr><td>User</td><td><code>{{ username }}</code></td></tr>
+                        <tr><td>Password</td><td>your password</td></tr>{% endif %}
+                    </table>
+                </li>
+                <li>Press <strong>Save</strong>.</li>
+            </ol>
+        </section>
+
+        {% if tinfoil_enabled %}
+        <section class="gd-card">
+            <h2 class="h5 mb-1">Tinfoil</h2>
+            <p class="form-text mt-0 mb-3">Browses the shop with artwork and sections for new games, updates and DLC.</p>
+            <ol class="gd-steps">
+                <li>On the Switch, open <strong>Tinfoil</strong>.</li>
+                <li>Go to <strong>File Browser</strong> → <strong>New</strong>.</li>
+                <li><span>Fill in:</span>
+                    {% if local_address %}
+                    <table class="gd-kv">
+                        <tr><td>Protocol</td><td><code>http</code></td></tr>
+                        <tr><td>Host</td><td><code>{{ local_address }}</code></td></tr>
+                        <tr><td>Port</td><td><code>{{ local_port }}</code></td></tr>
+                        <tr><td>Path</td><td><code>/</code></td></tr>
+                        {% if admin_account_created and not shop_public %}<tr><td>Username</td><td><code>{{ username }}</code></td></tr><tr><td>Password</td><td>your password</td></tr>{% endif %}
+                        <tr><td>Title</td><td><code>{{ shop_name }} - Local</code></td></tr>
+                        <tr><td>Enabled</td><td><code>YES</code></td></tr>
+                    </table>
+                    {% endif %}
+                    {% if remote_host %}
+                    <div class="form-text mt-2">Away from home, a second entry:</div>
+                    <table class="gd-kv">
+                        <tr><td>Protocol</td><td><code>https</code></td></tr>
+                        <tr><td>Host</td><td><code>{{ remote_host }}</code></td></tr>
+                        <tr><td>Path</td><td><code>/</code></td></tr>
+                        <tr><td>Title</td><td><code>{{ shop_name }} - Remote</code></td></tr>
+                    </table>
+                    {% endif %}
+                </li>
+                <li>Press <strong>Save</strong> to save the location and load the shop.</li>
+            </ol>
+            <p class="form-text mt-3 mb-0">In Path, use <code>/base</code>, <code>/update</code>, <code>/dlc</code> or <code>/multi</code> to show only that content.</p>
+        </section>
+        {% endif %}
+
+        {% if cyberfoil_enabled %}
+        <section class="gd-card">
+            <h2 class="h5 mb-1">CyberFoil</h2>
+            <p class="form-text mt-0 mb-3">A shop with sections for new games, updates and DLC.</p>
+            <ol class="gd-steps">
+                <li>On the Switch, open <strong>CyberFoil</strong>.</li>
+                <li>Open <strong>Settings</strong> → <strong>Shop</strong> → <strong>Add new shop</strong> <span>and fill in:</span>
+                    {% if local_address %}
+                    <table class="gd-kv">
+                        <tr><td>Shop title</td><td><code>{{ shop_name }} - Local</code></td></tr>
+                        <tr><td>Shop protocol</td><td><code>HTTP</code></td></tr>
+                        <tr><td>Host</td><td><code>{{ local_address }}</code></td></tr>
+                        <tr><td>Port</td><td><code>{{ local_port }}</code></td></tr>
+                        {% if admin_account_created and not shop_public %}<tr><td>Username</td><td><code>{{ username }}</code></td></tr><tr><td>Password</td><td>your password</td></tr>{% endif %}
+                    </table>
+                    {% endif %}
+                    {% if remote_host %}
+                    <div class="form-text mt-2">Away from home: protocol <code>HTTPS</code>, host <code>{{ remote_host }}</code>, port <code>443</code>.</div>
+                    {% endif %}
+                </li>
+                <li>Make sure <strong>Active shop</strong> is the new shop.</li>
+                <li>Press <strong>Back</strong> and open <strong>Install from eShop</strong>.</li>
+            </ol>
+        </section>
+        {% endif %}
+    </div>
+
+    {% if sphaira_enabled %}
+    <details class="gd-card gd-details mt-3">
+        <summary>Other ways to connect (browsing by folders)</summary>
+        <p class="form-text mt-2">The file browser of Sphaira and other older apps see the shop as a list of files, named their own way, which may not match the games recognized here.</p>
+        <ol class="gd-steps">
+            <li>In <strong>Sphaira</strong>, open <strong>Menu</strong> → <strong>Advanced Options</strong> → <strong>Install options</strong> and turn on <code>Enable emummc</code>.</li>
+            <li>Open <strong>Menu</strong> → <strong>Advanced Options</strong> → <strong>Add / modify mounts</strong> → <strong>Create New Entry</strong> <span>and fill in:</span>
+                <table class="gd-kv">
+                    <tr><td>Type</td><td><code>HTTP</code></td></tr>
+                    <tr><td>Name</td><td><code>{{ shop_name }}</code></td></tr>
+                    <tr><td>URL</td><td><code>{% if local_address %}http://{{ local_address }}{% else %}https://{{ remote_host }}{% endif %}</code></td></tr>
+                    <tr><td>Port</td><td><code>{% if local_address %}{{ local_port }}{% else %}443{% endif %}</code></td></tr>
+                    {% if admin_account_created and not shop_public %}<tr><td>User</td><td><code>{{ username }}</code></td></tr><tr><td>Password</td><td>your password</td></tr>{% endif %}
+                </table>
+            </li>
+            <li>Press <strong>Save</strong> and <strong>restart Sphaira</strong>.</li>
+            <li>Go to <strong>FileBrowser</strong> → <strong>Options</strong> → <strong>Mount</strong> and pick <code>[HTTP] {{ shop_name }}</code>.</li>
+            <li>To install a file, open it and press <strong>Options</strong> → <strong>Install</strong>.</li>
+        </ol>
+    </details>
+    {% endif %}
+</div>
+
+<script>
+    // navigator.clipboard only exists on https; on the home network the page is plain http
+    function copyText(text, button) {
+        const done = () => {
+            const label = button.textContent;
+            button.textContent = 'Copied';
+            setTimeout(() => { button.textContent = label; }, 2000);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done);
+            return;
+        }
+        const field = document.createElement('textarea');
+        field.value = text;
+        field.setAttribute('readonly', '');
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand('copy');
+        field.remove();
+        done();
+    }
+</script>
+{% endblock %}

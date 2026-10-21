@@ -1,12 +1,12 @@
 name: Imagem
 
-# Gera a imagem quando o GameDock muda e confere todo dia se saiu versão nova do Ownfoil
+# Testa e publica a imagem a cada mudança no código e a cada versão (tag v*)
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths-ignore: ['README.md', 'docs/**', 'LICENSE']
-  schedule:
-    - cron: '0 9 * * *'
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -22,67 +22,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Versão mais recente do Ownfoil
-        id: upstream
-        run: |
-          version=$(curl -fsSL https://api.github.com/repos/a1ex4/ownfoil/releases/latest | jq -r .tag_name)
-          version=${version#v}
-          [ -n "$version" ] && [ "$version" != null ] || { echo "versão não encontrada"; exit 1; }
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Ownfoil $version"
+      - name: Versão do Ownfoil usada como base
+        id: base
+        run: echo "version=$(cat UPSTREAM)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      # Primeiro uma imagem só para testar: ela sobe, faz login e abre todas as telas nos 3 idiomas
+      - name: Gerar imagem de teste
+        run: docker build --build-arg OWNFOIL_BASE=${{ steps.base.outputs.version }} -t gamedock:test .
 
-      # Na checagem diária, só gera de novo quando a versão do Ownfoil ainda não tem imagem
-      - name: Já existe imagem desta versão?
-        id: exists
-        if: github.event_name == 'schedule'
-        run: |
-          if docker manifest inspect "$IMAGE:${{ steps.upstream.outputs.version }}" >/dev/null 2>&1; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "A versão ${{ steps.upstream.outputs.version }} do Ownfoil já tem imagem publicada" >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - name: Testar
+        run: tests/smoke.sh gamedock:test
 
-      - uses: docker/setup-qemu-action@v3
-        if: steps.exists.outputs.skip != 'true'
-
-      - uses: docker/setup-buildx-action@v3
-        if: steps.exists.outputs.skip != 'true'
-
-      - uses: docker/build-push-action@v6
-        if: steps.exists.outputs.skip != 'true'
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          build-args: OWNFOIL_VERSION=${{ steps.upstream.outputs.version }}
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ steps.upstream.outputs.version }}
-            ${{ env.IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.title=GameDock
-            org.opencontainers.image.description=Ownfoil renomeado e em vários idiomas
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.upstream.outputs.version }}
-            org.opencontainers.image.licenses=AGPL-3.0
-
-      # Textos que cada idioma ainda não conhece (a maioria é código, não texto da tela)
       - name: Textos sem tradução
-        if: steps.exists.outputs.skip != 'true'
+        if: always()
         run: |
-          image="$IMAGE:${{ steps.upstream.outputs.version }}"
-          docker pull -q "$image" >/dev/null
-          mkdir untranslated
-          docker run --rm --entrypoint tar "$image" -C /app/untranslated -cf - . | tar -xf - -C untranslated
-          echo "## GameDock com o Ownfoil ${{ steps.upstream.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
-          for file in untranslated/*.txt; do
+          docker run --rm --entrypoint tar gamedock:test -C /app/untranslated -cf - . | tar -xf - -C . 2>/dev/null || exit 0
+          for file in *.txt; do
             {
-              echo
-              echo "<details><summary>$(basename "$file" .txt): $(grep -c . "$file") textos sem tradução</summary>"
+              echo "<details><summary>$(basename "$file" .txt): $(grep -c . "$file") textos sem tradução (a maioria é código)</summary>"
               echo
               echo '```'
               cat "$file"
@@ -90,3 +47,40 @@ jobs:
               echo "</details>"
             } >> "$GITHUB_STEP_SUMMARY"
           done
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        if: github.event_name != 'pull_request'
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=GameDock
+            org.opencontainers.image.licenses=AGPL-3.0
+
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v3
+        if: github.event_name != 'pull_request'
+
+      - uses: docker/setup-buildx-action@v3
+        if: github.event_name != 'pull_request'
+
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          build-args: OWNFOIL_BASE=${{ steps.base.outputs.version }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
