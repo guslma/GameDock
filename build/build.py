@@ -1,0 +1,136 @@
+"""Turns an official Ownfoil install into GameDock.
+
+    python3 build.py <app dir> <locales dir>
+
+1. Brand: the product name becomes GameDock. The Sphaira menu keeps the name Ownfoil,
+   since that is what the console shows.
+2. Languages: one translated copy of the templates and scripts per file in locales/,
+   plus English, in templates/<code>/ and static/js/<code>/.
+3. Runtime: gamedock_i18n.py picks the language of each request and the menu gets a
+   language switcher.
+
+Every change looks for an exact piece of the official code and stops the build when it
+is gone, so a new Ownfoil version can never ship half patched.
+"""
+
+import json
+import re
+import shutil
+import sys
+from pathlib import Path
+
+import translate
+
+HERE = Path(__file__).parent
+BRAND = "GameDock"
+ENGLISH = {"en": "English"}
+
+
+def patch(path, old, new, count=1):
+    source = path.read_text(encoding="utf-8")
+    if source.count(old) != count:
+        sys.exit(f"{path.name}: expected {count}x {old!r}, found {source.count(old)}; Ownfoil changed")
+    path.write_text(source.replace(old, new), encoding="utf-8")
+
+
+# The Sphaira menu is called Ownfoil on the console, so texts about it keep that name
+SPHAIRA_MENU = re.compile(r"(?<!menu do )(?<!menú de )(?<!→ )\bOwnfoil\b(?! menu)", re.I)
+
+
+def keeps_name(text):
+    return text.strip() == "Ownfoil"
+
+
+def branded(text):
+    return text if keeps_name(text) else SPHAIRA_MENU.sub(BRAND, text)
+
+
+def patch_server(app):
+    patch(app / "app.py", "app = create_app()\n",
+          "app = create_app()\nimport gamedock_i18n\ngamedock_i18n.install(app)\n")
+    patch(app / "app.py", "or 'Ownfoil'}", f"or '{BRAND}'}}")
+    patch(app / "constants.py", '"name": "Ownfoil",', f'"name": "{BRAND}",')
+    patch(app / "auth.py", 'realm="Ownfoil"', f'realm="{BRAND}"')
+    shutil.copy(HERE / "gamedock_i18n.py", app / "gamedock_i18n.py")
+
+
+def add_switcher(templates):
+    shutil.copy(HERE / "language.html", templates / "language.html")
+    # Next to Login / Logout, in both branches of the menu
+    patch(templates / "nav.html",
+          '<ul class="navbar-nav ms-auto">\n                <li class="nav-item">',
+          '<ul class="navbar-nav ms-auto">\n                {% include \'language.html\' %}\n                <li class="nav-item">',
+          count=2)
+
+
+TEMPLATE_REFERENCE = re.compile(r"""({%-?\s*(?:extends|include|import|from)\s+)(['"])([^'"/]+\.html)\2""")
+SCRIPT_REFERENCE = re.compile(r"""(filename=)(['"])js/([^'"/]+\.js)\2""")
+
+
+def point_to_locale(source, code):
+    """The translated templates extend, include and load the copies of the same language."""
+    source = TEMPLATE_REFERENCE.sub(lambda m: f"{m.group(1)}{m.group(2)}{code}/{m.group(3)}{m.group(2)}", source)
+    source = SCRIPT_REFERENCE.sub(lambda m: f"{m.group(1)}{m.group(2)}js/{code}/{m.group(3)}{m.group(2)}", source)
+    source = source.replace('<html lang="en"', f'<html lang="{code}"')
+    return source.replace('placeholder="Ownfoil"', f'placeholder="{BRAND}"')
+
+
+PAGE_TITLES = ("Files", "Library", "Login", "Services", "Settings", "Setup", "Stats", "Tasks")
+
+
+def translate_page_title(source, dictionary):
+    """The server passes the page name in English (title='Files'); the tab shows it translated."""
+    names = {name: dictionary[name] for name in PAGE_TITLES if name in dictionary}
+    return source.replace("{{title}}", "{{ %s.get(title, title) }}" % json.dumps(names, ensure_ascii=False))
+
+
+def build_locale(app, code, dictionary, statuses, report):
+    templates, scripts = app / "templates", app / "static" / "js"
+    copies = []
+    for source in sorted(templates.glob("*.html")):
+        target = templates / code / source.name
+        target.parent.mkdir(exist_ok=True)
+        shutil.copy(source, target)
+        copies.append(target)
+    for source in sorted(scripts.glob("*.js")):
+        target = scripts / code / source.name
+        target.parent.mkdir(exist_ok=True)
+        shutil.copy(source, target)
+        copies.append(target)
+    missing = set()
+    for path in copies:
+        missing |= translate.translate_file(path, dictionary, statuses)
+        if path.suffix == ".html":
+            source = point_to_locale(path.read_text(encoding="utf-8"), code)
+            if path.name == "base.html":
+                source = translate_page_title(source, dictionary)
+            path.write_text(source, encoding="utf-8")
+    if code != "en":
+        report.mkdir(exist_ok=True)
+        (report / f"{code}.txt").write_text("\n".join(sorted(missing)) + "\n", encoding="utf-8")
+    print(f"{code}: {len(dictionary)} texts, {len(missing)} not in the dictionary")
+
+
+def main():
+    app, locales_dir = Path(sys.argv[1]), Path(sys.argv[2])
+    patch_server(app)
+    add_switcher(app / "templates")
+
+    translate.collect_logic_strings(app)
+    texts = translate.extract(translate.files(app))
+    # English only changes the product name
+    english = {t: branded(t) for t in texts if branded(t) != t}
+
+    locales = dict(ENGLISH)
+    report = app / "untranslated"
+    build_locale(app, "en", english, {}, report)
+    for path in sorted(locales_dir.glob("*.json")):
+        dictionary, meta = translate.load_dictionary(path)
+        dictionary = {**english, **{k: branded(v) for k, v in dictionary.items()}}
+        build_locale(app, path.stem, dictionary, meta.get("@status", {}), report)
+        locales[path.stem] = meta.get("@name", path.stem)
+    (app / "templates" / "locales.json").write_text(json.dumps(locales, ensure_ascii=False), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

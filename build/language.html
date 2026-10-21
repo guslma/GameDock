@@ -1,0 +1,10 @@
+<li class="nav-item dropdown me-2">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Language">
+        <i class="bi bi-translate"></i> {{ gamedock_locale.split('-')[0] | upper }}
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end">
+        {% for code, name in gamedock_locales.items() %}
+        <li><a class="dropdown-item{% if code == gamedock_locale %} active{% endif %}" href="/language/{{ code }}" lang="{{ code }}">{{ name }}</a></li>
+        {% endfor %}
+    </ul>
+</li>
