@@ -16,16 +16,12 @@ from jinja2 import TemplateNotFound
 LOCALES = json.loads((Path(__file__).parent / "templates" / "locales.json").read_text(encoding="utf-8"))
 COOKIE = "gamedock_language"
 
-# GameDock's own version (app/VERSION), and the Ownfoil release its code is based on.
-# APP_VERSION stays Ownfoil's: the console apps read it to know which protocol to speak.
+# GameDock's own version (app/VERSION). constants.APP_VERSION is a different thing: the
+# protocol version the console apps read, which stays as Ownfoil defines it.
 try:
     VERSION = (Path(__file__).parent / "VERSION").read_text(encoding="utf-8").strip()
 except OSError:
     VERSION = ""
-try:
-    from constants import APP_VERSION as BASE_VERSION
-except ImportError:
-    BASE_VERSION = ""
 
 
 def default_locale():
@@ -77,7 +73,7 @@ def install(app):
     @app.context_processor
     def languages():
         return {"gamedock_locale": current_locale(), "gamedock_locales": LOCALES,
-                "gamedock_version": VERSION, "ownfoil_version": BASE_VERSION}
+                "gamedock_version": VERSION}
 
     @app.route("/language/<code>")
     def set_language(code):

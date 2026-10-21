@@ -4,13 +4,13 @@
   <p>A sua coleção de jogos de Nintendo Switch servida na sua rede, com a interface em português, inglês e espanhol.</p>
 </div>
 
-> **English:** GameDock is based on [Ownfoil](https://github.com/a1ex4/ownfoil), with a reorganized, easier interface in English, Portuguese and Spanish. New Ownfoil releases arrive as pull requests, tested before they are merged. Use the image `ghcr.io/guslma/gamedock` in place of `a1ex4/ownfoil`, with the same `config` and `data` folders.
+> **English:** GameDock is derived from [Ownfoil](https://github.com/a1ex4/ownfoil) and runs on its own, with a reorganized, easier interface in English, Portuguese and Spanish. Improvements from new Ownfoil releases can be brought in through pull requests, tested before they are merged. Use the image `ghcr.io/guslma/gamedock` in place of `a1ex4/ownfoil`, with the same `config` and `data` folders.
 
 ## O que é
 
 O GameDock organiza os seus jogos de Nintendo Switch e os serve na rede para o Tinfoil, o Sphaira e outros clientes: biblioteca com capas, verificação dos arquivos, compressão, organização automática e estatísticas.
 
-Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e usa as mesmas pastas e configurações. O que muda:
+Ele nasceu do [Ownfoil](https://github.com/a1ex4/ownfoil), segue com código e imagem próprios e usa as mesmas pastas e configurações, então dá para trocar um pelo outro. O que muda:
 
 - **Telas reorganizadas:** no menu, **Biblioteca**, **Conectar o console** e **Admin**. No Admin, só três itens:
   - **Visão geral:** os números da biblioteca, o que está rodando agora, os próximos agendamentos e avisos do que precisa de atenção.
@@ -20,8 +20,8 @@ Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e usa as mesmas pa
 - **Idiomas:** português, inglês e espanhol. Cada pessoa vê o idioma do próprio navegador e pode trocar pelo menu.
 - **Biblioteca:** visualização em cartões, capas ou lista, e uma barra com busca, um menu de filtros (jogos ou DLC, o que tenho ou não, atualização, DLC) e um menu de exibição (itens por página e tamanho dos cartões).
 - **Edição de usuários:** nome, senha e permissões, em **Admin → Configurações → Usuários**.
-- **Atualizações do Ownfoil com segurança:** quando sai uma versão nova, as mudanças dela chegam num pedido de atualização (pull request) com o resultado de um teste que abre todas as telas. Nada chega ao servidor sem aprovação.
-- **Sobre:** clicar no logo mostra a versão do GameDock, a versão do Ownfoil em que ele se baseia e o link do código-fonte.
+- **Melhorias do Ownfoil só se você quiser:** quando sai uma versão nova do Ownfoil, as mudanças dela chegam num pedido de atualização (pull request) com o resultado de um teste que abre todas as telas. Você aprova ou descarta; nada chega ao servidor sozinho.
+- **Sobre:** clicar no logo mostra a versão do GameDock e o link do código-fonte dessa versão.
 
 ## Como instalar
 
@@ -82,7 +82,7 @@ Depois, rode de novo o comando de instalação. Para fixar uma versão, use a ta
 
 ## Como funciona
 
-- [`app/`](app) é o código do app. Começou do Ownfoil 2.5.0 (o arquivo [`UPSTREAM`](UPSTREAM) diz qual versão) e tem as telas e recursos do GameDock.
+- [`app/`](app) é o código do app, com versão própria em [`app/VERSION`](app/VERSION). Ele nasceu do código do Ownfoil e segue por conta própria; o arquivo [`UPSTREAM`](UPSTREAM) só registra até qual versão do Ownfoil as melhorias deles já foram trazidas, para a checagem diária saber o que é novo.
 - A imagem é montada do zero a partir da imagem oficial do Python ([`Dockerfile`](Dockerfile)), com os pacotes de [`requirements.txt`](requirements.txt) nas versões fixas de [`requirements.lock`](requirements.lock). Não depende da imagem do Ownfoil.
 - As telas são escritas em inglês. [`i18n/localize.py`](i18n/localize.py) gera uma cópia delas para cada idioma com os dicionários de [`locales/`](locales), e [`app/gamedock_i18n.py`](app/gamedock_i18n.py) escolhe o idioma de cada acesso. Um texto que o dicionário não conhece continua em inglês, sem quebrar nada.
 - [`tests/smoke.sh`](tests/smoke.sh) sobe a imagem, entra e abre todas as telas nos 3 idiomas. Toda imagem passa por ele antes de ser publicada.

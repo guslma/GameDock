@@ -6,9 +6,10 @@ by a1ex4 and its contributors, licensed under the GNU Affero General Public
 License version 3 (AGPL-3.0). GameDock is distributed under the same license;
 see the LICENSE file.
 
-The code in app/ started from Ownfoil 2.5.0 (October 2026). The Ownfoil release
-it is currently based on is recorded in the UPSTREAM file. Modifications made
-by guslma, starting in October 2026:
+The code in app/ was derived from Ownfoil 2.5.0 in October 2026 and is
+maintained separately since then; the UPSTREAM file records up to which Ownfoil
+release improvements have been brought in. Modifications made by guslma,
+starting in October 2026:
 
 - New name, logo and visual theme.
 - Interface in English, Portuguese and Spanish, with a language selector
