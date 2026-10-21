@@ -10,6 +10,7 @@
    language switcher.
 4. Users: the edit button of each user, disabled in Ownfoil, opens a form that saves
    through gamedock_users.py.
+5. Library: the list view, also disabled in Ownfoil.
 
 Every change looks for an exact piece of the official code and stops the build when it
 is gone, so a new Ownfoil version can never ship half patched.
@@ -83,6 +84,31 @@ def add_user_editing(templates):
           (HERE / "edit_user.js").read_text(encoding="utf-8") + "    function submitNewUser() {")
 
 
+def add_list_view(templates):
+    """Ownfoil ships the list button of the library disabled; GameDock fills it in. The view
+    buttons become outlined so the selected one stands out."""
+    index = templates / "index.html"
+    patch(index, 'class="btn btn-primary view-toggle-btn', 'class="btn btn-outline-primary view-toggle-btn', count=3)
+    patch(index, 'data-view="list" disabled="">', 'data-view="list" title="List">')
+    patch(index, 'data-view="card"><i', 'data-view="card" title="Cards"><i')
+    patch(index, 'data-view="icon"><i', 'data-view="icon" title="Icons"><i')
+    patch(index,
+          "        if (isIcon) {\n            renderIconView(data.apps.items);\n        } else {\n",
+          "        $('#cardSizeRange').toggleClass('invisible', currentView === 'list');\n"
+          "        if (isIcon) {\n            renderIconView(data.apps.items);\n"
+          "        } else if (currentView === 'list') {\n            renderListView(data.apps.items.map(cardModel));\n"
+          "        } else {\n")
+    # The list shows the version the game reports (1.0.2), not Nintendo's number (131072)
+    patch(index, "versions { version owned releaseDate }", "versions { version owned releaseDate displayVersion }")
+    patch(index, "            release_date: v.releaseDate || 'Unknown',\n",
+          "            release_date: v.releaseDate || 'Unknown',\n            display_version: v.displayVersion,\n")
+    patch(index, "    function renderIconView(apps) {",
+          (HERE / "library_list.js").read_text(encoding="utf-8") + "    function renderIconView(apps) {")
+    patch(index, "<script src=\"{{ url_for('static', filename='js/format.js') }}\"></script>",
+          (HERE / "library_list.css").read_text(encoding="utf-8")
+          + "<script src=\"{{ url_for('static', filename='js/format.js') }}\"></script>")
+
+
 def add_switcher(templates):
     shutil.copy(HERE / "language.html", templates / "language.html")
     # Next to Login / Logout, in both branches of the menu
@@ -145,6 +171,7 @@ def main():
     patch_server(app)
     replace_artwork(app, branding)
     add_user_editing(app / "templates")
+    add_list_view(app / "templates")
     add_switcher(app / "templates")
 
     translate.collect_logic_strings(app)

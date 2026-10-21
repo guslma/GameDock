@@ -14,6 +14,7 @@ Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e funciona igual a
 
 - **Idioma automático:** cada pessoa vê o idioma do próprio navegador.
 - **Seletor no menu:** dá para trocar de idioma a qualquer momento, e a escolha fica salva no navegador.
+- **Biblioteca em lista:** além dos cartões e das capas, a biblioteca pode ser vista como lista, com nome, ID, tipo, versão e situação de cada jogo (o botão de lista vem desativado no Ownfoil).
 - **Edição de usuários:** em **Admin → Configurações**, o botão de lápis de cada usuário (desativado no Ownfoil) permite mudar o nome, a senha e as permissões.
 - **Sempre atualizado:** todo dia uma verificação confere se saiu versão nova do Ownfoil. Quando sai, a imagem do GameDock dessa versão é gerada e publicada sozinha.
 
