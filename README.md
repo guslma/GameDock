@@ -13,10 +13,11 @@ O GameDock organiza os seus jogos de Nintendo Switch e os serve na rede para o T
 Ele nasceu do [Ownfoil](https://github.com/a1ex4/ownfoil), segue com código e imagem próprios e usa as mesmas pastas e configurações, então dá para trocar um pelo outro. O que muda:
 
 - **Telas reorganizadas:** no menu, **Biblioteca**, **Conectar o console** e **Admin**. No Admin, só três itens:
-  - **Visão geral:** os números da biblioteca, o que está rodando agora, os próximos agendamentos e avisos do que precisa de atenção.
+  - **Visão geral:** os números da biblioteca, o que está rodando agora e os próximos agendamentos, **o que falta** (atualizações e DLC já lançadas que você ainda não tem), as tarefas que falharam e avisos do que precisa de atenção.
   - **Arquivos:** todos os arquivos, com filtros e ações (verificar, comprimir, identificar de novo, excluir).
-  - **Configurações**, em abas: Loja, Biblioteca, Usuários, Manutenção automática, Avançado e Logs, com um botão Salvar por aba e textos em linguagem simples. Em Logs dá para ver o registro do app, filtrar só avisos e erros, buscar e baixar.
+  - **Configurações**, em abas: Biblioteca, Loja, Usuários, Avisos, Manutenção automática, Avançado e Logs, com um botão Salvar por aba e textos em linguagem simples. Em Logs dá para ver o registro do app, filtrar só avisos e erros, buscar e baixar.
 - **Conectar o console:** os endereços de casa e de fora de casa com botão de copiar, e os passos do Sphaira, do Tinfoil e do CyberFoil lado a lado.
+- **Avisos no celular** por ntfy, Telegram ou Discord: jogos, atualizações e DLC que entraram na biblioteca, atualização ou DLC nova disponível para um jogo seu, arquivo que falhou na verificação e tarefa que falhou.
 - **Idiomas:** português, inglês e espanhol. Cada pessoa vê o idioma do próprio navegador e pode trocar pelo menu.
 - **Biblioteca:** visualização em cartões, capas ou lista, e uma barra com busca, um menu de filtros (jogos ou DLC, o que tenho ou não, atualização, DLC) e um menu de exibição (itens por página e tamanho dos cartões).
 - **Edição de usuários:** nome, senha e permissões, em **Admin → Configurações → Usuários**.

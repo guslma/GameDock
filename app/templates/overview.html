@@ -25,7 +25,7 @@
     <div id="attentionAlerts"></div>
     <div id="failedAlert" class="alert alert-warning d-none" role="alert">
         <span id="failedAlertText"></span>
-        <a href="#history" class="alert-link" onclick="document.getElementById('history').open = true">See</a>
+        <a href="#history" class="alert-link">See</a>
     </div>
 
     <div id="statTiles" class="gd-tiles"></div>
@@ -43,25 +43,9 @@
         <p id="scheduledEmpty" class="text-secondary fst-italic mb-0">Nothing scheduled.</p>
     </section>
 
-    <details class="gd-card gd-details" id="history">
-        <summary>Failed tasks and workers</summary>
-        <div class="task-section-head mt-3 mb-2">
-            <h3 class="h6 mb-0">Failed</h3>
-            <button type="button" id="purgeFailed" class="btn btn-outline-secondary btn-sm ms-auto d-none"
-                    onClick="purgeFailed()">Dismiss all failed tasks</button>
-        </div>
-        <div class="task-scroll">
-            <ul id="failedTasks" class="task-list"></ul>
-        </div>
-        <p id="failedEmpty" class="text-secondary fst-italic">No failures.</p>
-        <h3 class="h6 mt-4 mb-2">Workers</h3>
-        <div id="workerCards" class="row g-3"></div>
-        <p class="form-text mt-3 mb-0">How many run at once: <a href="/admin/settings#advanced">Settings → Advanced</a>.</p>
-    </details>
-
-    <details class="gd-card gd-details">
-        <summary>Detailed library figures</summary>
-        <div class="stat-sections mt-3">
+    <section class="gd-card">
+        <h2 class="h5 mb-3">Detailed library figures</h2>
+        <div class="stat-sections mt-2">
             <section>
                 <h3 class="h6 mb-2">By format</h3>
                 <table class="table table-sm stat-table">
@@ -91,12 +75,135 @@
                 </table>
             </section>
         </div>
-    </details>
+    </section>
+
+    <section class="gd-card" id="missingCard">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h2 class="h5 mb-0 me-auto">What is missing</h2>
+            <span class="text-secondary small" id="missingSummary"></span>
+        </div>
+        <p class="form-text mt-0 mb-3">Updates and DLC already released for the games you have.</p>
+        <div id="missingList" class="gd-missing"></div>
+        <p id="missingEmpty" class="text-secondary mb-0 d-none">Nothing missing: every game has the latest update and every DLC.</p>
+        <button type="button" class="btn btn-link btn-sm px-0 d-none" id="missingMore">Show all</button>
+    </section>
+
+    <section class="gd-card" id="history">
+        <h2 class="h5 mb-0">Failed tasks and workers</h2>
+        <div class="task-section-head mt-2 mb-2">
+            <h3 class="h6 mb-0">Failed</h3>
+            <button type="button" id="purgeFailed" class="btn btn-outline-secondary btn-sm ms-auto d-none"
+                    onClick="purgeFailed()">Dismiss all failed tasks</button>
+        </div>
+        <div class="task-scroll">
+            <ul id="failedTasks" class="task-list"></ul>
+        </div>
+        <p id="failedEmpty" class="text-secondary fst-italic">No failures.</p>
+        <h3 class="h6 mt-4 mb-2">Worker processes</h3>
+        <div id="workerCards" class="row g-3"></div>
+        <p class="form-text mt-3 mb-0">How many run at once: <a href="/admin/settings#advanced">Settings → Advanced</a>.</p>
+    </section>
+
 
 </div>
 {% endblock %}
 
 {% block panel_scripts %}
+<script>
+    // What is missing: newest update and DLC not in the library, per game
+    const MISSING_SHOWN = 8;
+
+    // 2026-08-16 in the page's language (16/08/2026 in Portuguese)
+    function localDate(iso) {
+        const [y, m, d] = iso.split('-').map(Number);
+        return y && m && d ? new Date(y, m - 1, d).toLocaleDateString(document.documentElement.lang) : iso;
+    }
+
+    async function loadMissing() {
+        let games;
+        try {
+            games = await (await fetch('/api/gamedock/missing', {credentials: 'same-origin'})).json();
+        } catch (e) {
+            return;
+        }
+        const list = document.getElementById('missingList');
+        list.innerHTML = '';
+        document.getElementById('missingEmpty').classList.toggle('d-none', games.length > 0);
+        const updates = games.filter(g => g.update).length;
+        const dlcs = games.reduce((n, g) => n + g.dlc.length, 0);
+        const updatesText = updates === 1 ? '1 update missing' : `${updates} updates missing`;
+        const dlcText = dlcs === 1 ? '1 DLC missing' : `${dlcs} DLC missing`;
+        document.getElementById('missingSummary').textContent = games.length ? `${updatesText} · ${dlcText}` : '';
+
+        games.forEach((game, index) => {
+            const row = document.createElement('a');
+            row.className = 'gd-missing-row' + (index >= MISSING_SHOWN ? ' d-none gd-missing-extra' : '');
+            row.href = `/title/${game.title_id}`;
+            const icon = document.createElement('img');
+            icon.className = 'gd-missing-icon';
+            icon.alt = '';
+            icon.dataset.titleId = game.title_id;
+            const text = document.createElement('div');
+            text.className = 'gd-missing-text';
+            const name = document.createElement('div');
+            name.className = 'gd-missing-name';
+            name.textContent = game.name;
+            text.append(name);
+            if (game.update) {
+                const line = document.createElement('div');
+                line.className = 'gd-missing-line';
+                const pill = document.createElement('span');
+                pill.className = 'gd-pill gd-pill-warn';
+                pill.textContent = 'Update';
+                const what = document.createElement('span');
+                const u = game.update;
+                const have = u.have_number
+                    ? ` · you have no. ${u.have_number}` + (u.have_display ? ` (${u.have_display})` : '')
+                    : ' · you have none';
+                what.textContent = ` no. ${u.number}` + (u.released ? ` (${localDate(u.released)})` : '') + have;
+                line.append(pill, what);
+                text.append(line);
+            }
+            game.dlc.forEach(dlc => {
+                const line = document.createElement('div');
+                line.className = 'gd-missing-line';
+                const pill = document.createElement('span');
+                pill.className = 'gd-pill gd-pill-muted';
+                pill.textContent = 'DLC';
+                const what = document.createElement('span');
+                what.textContent = ' ' + dlc.name + (dlc.released ? ` (${localDate(dlc.released)})` : '');
+                line.append(pill, what);
+                text.append(line);
+            });
+            row.append(icon, text);
+            list.append(row);
+        });
+        const more = document.getElementById('missingMore');
+        more.classList.toggle('d-none', games.length <= MISSING_SHOWN);
+        more.onclick = () => {
+            document.querySelectorAll('.gd-missing-extra').forEach(r => r.classList.remove('d-none'));
+            more.classList.add('d-none');
+        };
+        loadMissingIcons(games.map(g => g.title_id));
+    }
+
+    // Icons in one GraphQL call, one alias per game
+    async function loadMissingIcons(ids) {
+        if (!ids.length) return;
+        const fields = ids.map((id, i) => `t${i}: title(titleId: "${id}") { icon(size: THUMB) { url } }`).join(' ');
+        try {
+            const body = await (await fetch('/api/graphql?' + new URLSearchParams({query: `query { ${fields} }`}),
+                {credentials: 'same-origin'})).json();
+            ids.forEach((id, i) => {
+                const url = (((body.data || {})[`t${i}`] || {}).icon || {}).url;
+                const img = document.querySelector(`.gd-missing-icon[data-title-id="${id}"]`);
+                if (url && img) img.src = url;
+            });
+        } catch (e) { /* icons are optional */ }
+    }
+
+    loadMissing();
+</script>
 <script src="{{ url_for('static', filename='js/format.js') }}"></script>
 <script>
     // Alerts on top: tasks that failed and files that need a look
@@ -556,6 +663,10 @@
         document.getElementById(emptyId).classList.toggle('d-none', count > 0);
     }
 
+    const workerLabel = 'Process';
+    const workerOn = 'Running';
+    const workerOff = 'Stopped';
+
     function renderWorkers() {
         const container = document.getElementById('workerCards');
         container.innerHTML = '';
@@ -573,9 +684,9 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <h5 class="card-title d-flex justify-content-between">
-                            <span>Worker ${worker.id}</span>
+                            <span>${workerLabel} ${worker.id}</span>
                             <span class="badge ${worker.alive ? 'text-bg-success' : 'text-bg-danger'}">
-                                ${worker.alive ? 'alive' : 'stopped'}</span>
+                                ${worker.alive ? workerOn : workerOff}</span>
                         </h5>
                         <p class="card-subtitle text-secondary small mb-2">pid ${worker.pid ?? '—'}</p>
                         <div class="worker-task"></div>

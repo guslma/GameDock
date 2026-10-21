@@ -40,6 +40,10 @@ def init():
     # Start UDP discovery for clients on the LAN
     discovery.reconcile()
 
+    # GameDock: notifications (checks the library every minute)
+    import gamedock_notify
+    gamedock_notify.start(app)
+
     # init libraries
     library_paths = get_library_paths()
     init_libraries(app, watcher, library_paths)
@@ -184,6 +188,8 @@ gamedock_i18n.install(app)
 import gamedock_users
 gamedock_users.install(app)
 gamedock_system.install(app)
+import gamedock_notify
+gamedock_notify.install(app)
 
 # Realtime WebSocket. ping_interval keeps idle sockets alive through proxies and lets
 # the server notice a peer that went away without closing.

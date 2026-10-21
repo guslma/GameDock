@@ -20,9 +20,10 @@
                 </div>
 
                 <ul class="nav gd-tabs" id="settingsTabs" role="tablist">
-                    <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-shop" data-bs-toggle="tab" data-bs-target="#pane-shop" type="button" role="tab" aria-controls="pane-shop" aria-selected="true" data-hash="shop">Shop</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-library" data-bs-toggle="tab" data-bs-target="#pane-library" type="button" role="tab" aria-controls="pane-library" aria-selected="false" data-hash="library">Library</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-library" data-bs-toggle="tab" data-bs-target="#pane-library" type="button" role="tab" aria-controls="pane-library" aria-selected="true" data-hash="library">Library</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-shop" data-bs-toggle="tab" data-bs-target="#pane-shop" type="button" role="tab" aria-controls="pane-shop" aria-selected="false" data-hash="shop">Shop</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-users" data-bs-toggle="tab" data-bs-target="#pane-users" type="button" role="tab" aria-controls="pane-users" aria-selected="false" data-hash="users">Users</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-notify" data-bs-toggle="tab" data-bs-target="#pane-notify" type="button" role="tab" aria-controls="pane-notify" aria-selected="false" data-hash="notifications">Notifications</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-maintenance" data-bs-toggle="tab" data-bs-target="#pane-maintenance" type="button" role="tab" aria-controls="pane-maintenance" aria-selected="false" data-hash="maintenance">Automatic maintenance</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-advanced" data-bs-toggle="tab" data-bs-target="#pane-advanced" type="button" role="tab" aria-controls="pane-advanced" aria-selected="false" data-hash="advanced">Advanced</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-logs" data-bs-toggle="tab" data-bs-target="#pane-logs" type="button" role="tab" aria-controls="pane-logs" aria-selected="false" data-hash="logs">Logs</button></li>
@@ -31,7 +32,7 @@
                 <div class="tab-content">
 
                 <!-- ===================== SHOP ===================== -->
-                <div class="tab-pane fade show active" id="pane-shop" role="tabpanel" aria-labelledby="tab-shop" tabindex="0">
+                <div class="tab-pane fade" id="pane-shop" role="tabpanel" aria-labelledby="tab-shop" tabindex="0">
                     <section class="gd-card">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -108,7 +109,7 @@
                 </div>
 
                 <!-- ===================== LIBRARY ===================== -->
-                <div class="tab-pane fade" id="pane-library" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
+                <div class="tab-pane fade show active" id="pane-library" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
                     <section class="gd-card">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                             <h2 class="me-auto mb-0">Folders with games</h2>
@@ -343,6 +344,88 @@
                 </div>
                 </div>
 
+                <!-- ===================== NOTIFICATIONS ===================== -->
+                <div class="tab-pane fade" id="pane-notify" role="tabpanel" aria-labelledby="tab-notify" tabindex="0">
+                    <section class="gd-card">
+                        <h2>Where to receive</h2>
+                        <p class="gd-lead">GameDock checks the library every minute and sends a message when something on the list below happens.</p>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="notifyProvider" class="form-label">Service</label>
+                                <select id="notifyProvider" class="form-select">
+                                    <option value="">Off</option>
+                                    <option value="ntfy">ntfy</option>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="discord">Discord</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8 gd-notify-field" data-provider="ntfy">
+                                <label for="notifyNtfyUrl" class="form-label">Topic address</label>
+                                <input id="notifyNtfyUrl" class="form-control" placeholder="https://ntfy.sh/my-gamedock">
+                                <div class="form-text">Install the ntfy app on the phone, subscribe to a topic with a hard-to-guess name and paste its address here.</div>
+                            </div>
+                            <div class="col-md-8 gd-notify-field" data-provider="ntfy">
+                                <label for="notifyNtfyToken" class="form-label">Access token (optional)</label>
+                                <input id="notifyNtfyToken" class="form-control" type="password" autocomplete="off">
+                                <div class="form-text gd-secret-note" data-for="ntfy_token">Only for protected topics.</div>
+                            </div>
+                            <div class="col-md-8 gd-notify-field" data-provider="telegram">
+                                <label for="notifyTelegramToken" class="form-label">Bot token</label>
+                                <input id="notifyTelegramToken" class="form-control" type="password" autocomplete="off">
+                                <div class="form-text gd-secret-note" data-for="telegram_token">Create a bot with @BotFather on Telegram and paste the token it gives you.</div>
+                            </div>
+                            <div class="col-md-8 gd-notify-field" data-provider="telegram">
+                                <label for="notifyTelegramChat" class="form-label">Chat ID</label>
+                                <input id="notifyTelegramChat" class="form-control">
+                                <div class="form-text">Send a message to the bot, then open api.telegram.org/botTOKEN/getUpdates (with your token) and look for the chat id.</div>
+                            </div>
+                            <div class="col-md-8 gd-notify-field" data-provider="discord">
+                                <label for="notifyDiscordWebhook" class="form-label">Webhook address</label>
+                                <input id="notifyDiscordWebhook" class="form-control" type="password" autocomplete="off" placeholder="https://discord.com/api/webhooks/...">
+                                <div class="form-text gd-secret-note" data-for="discord_webhook">In the Discord channel: Edit channel → Integrations → Webhooks.</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="gd-card">
+                        <h2>What to notify</h2>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="notifyNewContent">
+                                <span class="gd-setting-title">New in the library</span>
+                                <span class="gd-setting-help">Games, updates and DLC that joined the library.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="notifyNewContent" data-event="new_content"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="notifyMissing">
+                                <span class="gd-setting-title">New update or DLC available</span>
+                                <span class="gd-setting-help">When a game you have gets an update or DLC you do not have yet.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="notifyMissing" data-event="missing_content"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="notifyVerification">
+                                <span class="gd-setting-title">File failed verification</span>
+                                <span class="gd-setting-help">A game came corrupted or modified.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="notifyVerification" data-event="verification"></div>
+                        </div>
+                        <div class="gd-setting">
+                            <label class="gd-setting-text" for="notifyTaskFailed">
+                                <span class="gd-setting-title">Task failed</span>
+                                <span class="gd-setting-help">A background task ended with an error.</span>
+                            </label>
+                            <div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="notifyTaskFailed" data-event="task_failed"></div>
+                        </div>
+                    </section>
+
+                    <div class="gd-save-bar">
+                        <span class="gd-saved" id="notifyStatus" aria-live="polite"></span>
+                        <button type="button" class="btn btn-outline-secondary" id="notifyTest">Send a test</button>
+                        <button type="button" class="btn btn-primary px-4" id="notifySave">Save</button>
+                    </div>
+                </div>
+
                 <!-- ===================== AUTOMATIC MAINTENANCE ===================== -->
                 <div class="tab-pane fade" id="pane-maintenance" role="tabpanel" aria-labelledby="tab-maintenance" tabindex="0">
                     <p class="gd-page-lead">What GameDock does by itself with the files once they join the library.</p>
@@ -568,6 +651,67 @@
 {% endblock %}
 
 {% block panel_scripts %}
+<script>
+    // Settings > Notifications
+    const NOTIFY_SECRETS = {ntfy_token: 'notifyNtfyToken', telegram_token: 'notifyTelegramToken', discord_webhook: 'notifyDiscordWebhook'};
+
+    function showNotifyFields() {
+        const provider = document.getElementById('notifyProvider').value;
+        document.querySelectorAll('.gd-notify-field').forEach(f => f.classList.toggle('d-none', f.dataset.provider !== provider));
+        document.getElementById('notifyTest').disabled = !provider;
+    }
+
+    function fillNotify(settings) {
+        document.getElementById('notifyProvider').value = settings.provider;
+        document.getElementById('notifyNtfyUrl').value = settings.ntfy_url;
+        document.getElementById('notifyTelegramChat').value = settings.telegram_chat;
+        document.querySelectorAll('[data-event]').forEach(box => { box.checked = !!settings.events[box.dataset.event]; });
+        // Saved tokens never come back to the page: the field shows that one is saved
+        Object.entries(NOTIFY_SECRETS).forEach(([key, id]) => {
+            const input = document.getElementById(id);
+            input.value = '';
+            if (input.dataset.placeholder === undefined) input.dataset.placeholder = input.placeholder;
+            input.placeholder = settings['has_' + key] ? 'Saved (type to replace)' : input.dataset.placeholder;
+        });
+        showNotifyFields();
+    }
+
+    function notifyStatus(text, ok) {
+        const status = document.getElementById('notifyStatus');
+        status.textContent = text;
+        status.style.color = ok ? '' : 'var(--gd-warn)';
+    }
+
+    async function saveNotify() {
+        const data = {
+            provider: document.getElementById('notifyProvider').value,
+            ntfy_url: document.getElementById('notifyNtfyUrl').value,
+            telegram_chat: document.getElementById('notifyTelegramChat').value,
+            events: {},
+        };
+        Object.entries(NOTIFY_SECRETS).forEach(([key, id]) => {
+            const value = document.getElementById(id).value;
+            if (value) data[key] = value;
+        });
+        document.querySelectorAll('[data-event]').forEach(box => { data.events[box.dataset.event] = box.checked; });
+        const result = await (await fetch('/api/gamedock/notify', {
+            method: 'POST', credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data),
+        })).json();
+        fillNotify(result.settings);
+        notifyStatus('Settings saved.', true);
+    }
+
+    document.getElementById('notifyProvider').addEventListener('change', showNotifyFields);
+    document.getElementById('notifySave').addEventListener('click', saveNotify);
+    document.getElementById('notifyTest').addEventListener('click', async () => {
+        await saveNotify();
+        notifyStatus('Sending…', true);
+        const result = await (await fetch('/api/gamedock/notify/test', {method: 'POST', credentials: 'same-origin'})).json();
+        notifyStatus(result.success ? 'Test sent. Check your phone.' : 'Could not send: ' + result.error, result.success);
+    });
+    fetch('/api/gamedock/notify', {credentials: 'same-origin'}).then(r => r.json()).then(r => fillNotify(r.settings));
+</script>
 <script>
     // Settings > Logs: the newest lines of the shared log file
     const logBox = document.getElementById('logBox');
