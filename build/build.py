@@ -11,6 +11,7 @@
 4. Users: the edit button of each user, disabled in Ownfoil, opens a form that saves
    through gamedock_users.py.
 5. Library: the list view, also disabled in Ownfoil.
+6. About: the logo and name at the top left open a dialog with the version and links.
 
 Every change looks for an exact piece of the official code and stops the build when it
 is gone, so a new Ownfoil version can never ship half patched.
@@ -118,6 +119,16 @@ def add_switcher(templates):
           count=2)
 
 
+def add_about(templates):
+    """The logo and name at the top left open an About dialog."""
+    shutil.copy(HERE / "about.html", templates / "about.html")
+    nav = templates / "nav.html"
+    patch(nav, '<a class="navbar-brand p-0" href="#">',
+          '<a class="navbar-brand p-0" href="#" role="button" data-bs-toggle="modal" data-bs-target="#aboutModal">')
+    source = nav.read_text(encoding="utf-8")
+    nav.write_text(source.rstrip() + "\n{% include 'about.html' %}\n", encoding="utf-8")
+
+
 TEMPLATE_REFERENCE = re.compile(r"""({%-?\s*(?:extends|include|import|from)\s+)(['"])([^'"/]+\.html)\2""")
 SCRIPT_REFERENCE = re.compile(r"""(filename=)(['"])js/([^'"/]+\.js)\2""")
 
@@ -173,6 +184,7 @@ def main():
     add_user_editing(app / "templates")
     add_list_view(app / "templates")
     add_switcher(app / "templates")
+    add_about(app / "templates")
 
     translate.collect_logic_strings(app)
     texts = translate.extract(translate.files(app))
