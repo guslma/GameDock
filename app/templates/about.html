@@ -9,10 +9,14 @@
                 <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <p class="about-text">GameDock organizes your Nintendo Switch game collection and serves it on your network.</p>
+            <p class="about-text about-small">
+                <span>Based on</span> <a href="https://github.com/a1ex4/ownfoil" target="_blank" rel="noopener">Ownfoil</a> {{ ownfoil_version }}.
+                <span>Free software under the</span> <a href="https://github.com/guslma/GameDock/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0</a>.
+            </p>
             <div class="about-links">
-                <a class="about-link" href="https://github.com/guslma/GameDock" target="_blank" rel="noopener">
+                <a class="about-link" href="https://github.com/guslma/GameDock/tree/v{{ gamedock_version }}" target="_blank" rel="noopener">
                     <span class="about-link-icon"><i class="bi bi-github"></i></span>
-                    <span>GitHub</span>
+                    <span>Source code</span>
                 </a>
                 <a class="about-link" href="https://github.com/a1ex4/ownfoil" target="_blank" rel="noopener">
                     <span class="about-link-icon"><i class="bi bi-diagram-2"></i></span>
@@ -39,6 +43,8 @@
         border: 1px solid var(--bs-border-color); color: var(--bs-secondary-color);
     }
     .about-text { color: var(--bs-secondary-color); margin: 18px 0; line-height: 1.6; }
+    .about-text.about-small { font-size: .85rem; margin-top: -8px; }
+    .about-text a { color: #1FB8E8; text-decoration: none; }
     .about-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .about-link {
         display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;

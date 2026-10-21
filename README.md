@@ -18,9 +18,10 @@ Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e usa as mesmas pa
   - **Configurações**, em abas: Loja, Biblioteca, Usuários, Manutenção automática e Avançado, com um botão Salvar por aba e textos em linguagem simples.
 - **Conectar o console:** os endereços de casa e de fora de casa com botão de copiar, e os passos do Sphaira, do Tinfoil e do CyberFoil lado a lado.
 - **Idiomas:** português, inglês e espanhol. Cada pessoa vê o idioma do próprio navegador e pode trocar pelo menu.
-- **Biblioteca em lista**, além dos cartões e das capas, e filtros visíveis (jogos ou DLC, o que tenho ou não, atualização, DLC).
-- **Edição de usuários:** nome, senha e permissões.
-- **Atualizações do Ownfoil com segurança:** quando sai uma versão nova, um pedido de atualização (pull request) é aberto sozinho com as mudanças e o resultado de um teste que abre todas as telas. Nada chega ao servidor sem aprovação.
+- **Biblioteca:** visualização em cartões, capas ou lista, e uma barra com busca, um menu de filtros (jogos ou DLC, o que tenho ou não, atualização, DLC) e um menu de exibição (itens por página e tamanho dos cartões).
+- **Edição de usuários:** nome, senha e permissões, em **Admin → Configurações → Usuários**.
+- **Atualizações do Ownfoil com segurança:** quando sai uma versão nova, as mudanças dela chegam num pedido de atualização (pull request) com o resultado de um teste que abre todas as telas. Nada chega ao servidor sem aprovação.
+- **Sobre:** clicar no logo mostra a versão do GameDock, a versão do Ownfoil em que ele se baseia e o link do código-fonte.
 
 ## Como instalar
 
@@ -39,6 +40,9 @@ sudo docker run -d --name gamedock \
 ```
 
 Depois, abra `http://IP-DA-MÁQUINA:8465` no navegador. A imagem funciona em computadores comuns (amd64) e em ARM (arm64 e armv7).
+
+- O usuário de `USER_ADMIN_NAME` e `USER_ADMIN_PASSWORD` é recriado a cada início do contêiner. Para mudar a senha dele, mude a variável. Os outros usuários são criados e editados em **Admin → Configurações → Usuários**.
+- Para o console achar o servidor sozinho na rede (opção **Encontrar na rede de casa**), o contêiner precisa da rede do host: `--network host` no lugar de `-p 8465:8465`, ou `network_mode: host` no Compose. Sem isso, basta digitar o endereço no console.
 
 Com Docker Compose:
 
@@ -74,7 +78,7 @@ sudo docker pull ghcr.io/guslma/gamedock:latest
 sudo docker rm -f gamedock
 ```
 
-Depois, rode de novo o comando de instalação. Para fixar uma versão, use a tag dela, como `ghcr.io/guslma/gamedock:1.0.0`.
+Depois, rode de novo o comando de instalação. Para fixar uma versão, use a tag dela, como `ghcr.io/guslma/gamedock:1.0.1`. As versões do GameDock estão no arquivo [`app/VERSION`](app/VERSION) e nas tags `vX.Y.Z` do repositório.
 
 ## Como funciona
 
@@ -82,7 +86,7 @@ Depois, rode de novo o comando de instalação. Para fixar uma versão, use a ta
 - A imagem usa a oficial do Ownfoil da mesma versão só como base, pelo Python e pelas ferramentas que ela já traz, e troca o código do app pelo do GameDock ([`Dockerfile`](Dockerfile)).
 - As telas são escritas em inglês. [`i18n/localize.py`](i18n/localize.py) gera uma cópia delas para cada idioma com os dicionários de [`locales/`](locales), e [`app/gamedock_i18n.py`](app/gamedock_i18n.py) escolhe o idioma de cada acesso. Um texto que o dicionário não conhece continua em inglês, sem quebrar nada.
 - [`tests/smoke.sh`](tests/smoke.sh) sobe a imagem, entra e abre todas as telas nos 3 idiomas. Toda imagem passa por ele antes de ser publicada.
-- [`.github/workflows/ownfoil.yaml`](.github/workflows/ownfoil.yaml) confere todo dia se saiu versão nova do Ownfoil e abre o pedido de atualização.
+- [`.github/workflows/ownfoil.yaml`](.github/workflows/ownfoil.yaml) confere todo dia se saiu versão nova do Ownfoil e abre o pedido de atualização. Para ele conseguir abrir pull requests, ligue **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** no repositório; sem isso, ele abre uma issue com o link das mudanças.
 
 Os textos que ficaram sem tradução aparecem no resumo de cada execução em **Actions**.
 
@@ -94,4 +98,8 @@ Os textos que ficaram sem tradução aparecem no resumo de cada execução em **
 
 ## Créditos e licença
 
-O GameDock é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil), de a1ex4, e distribuído sob a mesma licença, a AGPL-3.0. Veja o arquivo [`LICENSE`](LICENSE).
+O GameDock é uma versão modificada do [Ownfoil](https://github.com/a1ex4/ownfoil), de a1ex4 e colaboradores, e é distribuído sob a mesma licença, a [AGPL-3.0](LICENSE). O arquivo [`NOTICE`](NOTICE) lista o que foi modificado e os componentes de terceiros (Bootstrap, Bootstrap Icons e jQuery, sob licença MIT).
+
+Pela AGPL, quem usa o GameDock pela rede tem direito ao código-fonte da versão que está rodando: o link **Código-fonte**, na janela **Sobre** (clicando no logo), aponta para ele. Quem publicar uma versão modificada precisa fazer o mesmo.
+
+Nintendo Switch é marca da Nintendo. O GameDock não tem ligação com a Nintendo nem com o projeto Ownfoil.

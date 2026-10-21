@@ -1,6 +1,8 @@
 name: Imagem
 
-# Testa e publica a imagem a cada mudança no código e a cada versão (tag v*)
+# Testa e publica a imagem a cada mudança no código. A versão vem de app/VERSION: quando ela
+# muda, a imagem ganha essa tag e o repositório ganha a tag vX.Y.Z (o link do código-fonte
+# na janela Sobre aponta para ela)
 on:
   push:
     branches: [main]
@@ -10,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -24,7 +26,9 @@ jobs:
 
       - name: Versão do Ownfoil usada como base
         id: base
-        run: echo "version=$(cat UPSTREAM)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(cat UPSTREAM)" >> "$GITHUB_OUTPUT"
+          echo "gamedock=$(cat app/VERSION)" >> "$GITHUB_OUTPUT"
 
       # Primeiro uma imagem só para testar: ela sobe, faz login e abre todas as telas nos 3 idiomas
       - name: Gerar imagem de teste
@@ -55,6 +59,7 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.base.outputs.gamedock }},enable={{is_default_branch}}
             type=sha
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -84,3 +89,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Marcar a versão no repositório
+        if: github.ref == 'refs/heads/main'
+        run: |
+          tag="v${{ steps.base.outputs.gamedock }}"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            git tag "$tag"
+            git push origin "$tag"
+          fi

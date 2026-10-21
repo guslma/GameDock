@@ -1,0 +1,37 @@
+GameDock
+Copyright (C) 2026 guslma
+
+GameDock is a modified version of Ownfoil (https://github.com/a1ex4/ownfoil),
+by a1ex4 and its contributors, licensed under the GNU Affero General Public
+License version 3 (AGPL-3.0). GameDock is distributed under the same license;
+see the LICENSE file.
+
+The code in app/ started from Ownfoil 2.5.0 (October 2026). The Ownfoil release
+it is currently based on is recorded in the UPSTREAM file. Modifications made
+by guslma, starting in October 2026:
+
+- New name, logo and visual theme.
+- Interface in English, Portuguese and Spanish, with a language selector
+  (app/gamedock_i18n.py, i18n/, locales/).
+- Reorganized screens: Overview (former Stats and Tasks pages), Settings in
+  tabs (with the former Services page), "Connect your console" (former Setup
+  page) and a library toolbar with filter menus.
+- List view of the library, editing of users (app/gamedock_users.py) and an
+  About dialog.
+- Fixes: the console address shown inside Docker bridge networks, and the
+  Settings page on a fresh install before the catalogue is downloaded.
+
+The full history of these changes is in this repository's Git log.
+
+Third-party components shipped in app/static/vendor/, under their own licenses
+(MIT), with their notices kept in the files:
+- Bootstrap 5.3.1 (https://getbootstrap.com)
+- Bootstrap Icons 1.11.1 (https://icons.getbootstrap.com)
+- jQuery 3.6.0 (https://jquery.com)
+
+The Docker image is built on top of the official Ownfoil image
+(a1ex4/ownfoil), which brings the Python runtime and the tools Ownfoil uses;
+their source and licenses are available from the Ownfoil project.
+
+Nintendo Switch is a trademark of Nintendo. GameDock is not affiliated with or
+endorsed by Nintendo, nor by the Ownfoil project.
