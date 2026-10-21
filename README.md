@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="branding/logo/logo.svg" alt="GameDock" width="96" height="96">
   <h1>GameDock</h1>
   <p>A sua coleção de jogos de Nintendo Switch servida na sua rede, com a interface em português, inglês e espanhol.</p>
 </div>

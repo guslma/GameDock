@@ -1,8 +1,8 @@
 """Turns an official Ownfoil install into GameDock.
 
-    python3 build.py <app dir> <locales dir>
+    python3 build.py <app dir> <locales dir> <branding dir>
 
-1. Brand: the product name becomes GameDock. The Sphaira menu keeps the name Ownfoil,
+1. Brand: the product name and logo become GameDock. The Sphaira menu keeps the name Ownfoil,
    since that is what the console shows.
 2. Languages: one translated copy of the templates and scripts per file in locales/,
    plus English, in templates/<code>/ and static/js/<code>/.
@@ -52,6 +52,18 @@ def patch_server(app):
     patch(app / "constants.py", '"name": "Ownfoil",', f'"name": "{BRAND}",')
     patch(app / "auth.py", 'realm="Ownfoil"', f'realm="{BRAND}"')
     shutil.copy(HERE / "gamedock_i18n.py", app / "gamedock_i18n.py")
+
+
+def replace_artwork(app, branding):
+    """The GameDock logo and icons, in the same files and sizes the Ownfoil ones used."""
+    for source in sorted(branding.rglob("*")):
+        relative = source.relative_to(branding)
+        if source.is_dir() or len(relative.parts) == 1:
+            continue
+        target = app / "static" / relative
+        if not target.exists():
+            sys.exit(f"static/{relative}: not in Ownfoil anymore; Ownfoil changed")
+        shutil.copy(source, target)
 
 
 def add_switcher(templates):
@@ -112,8 +124,9 @@ def build_locale(app, code, dictionary, statuses, report):
 
 
 def main():
-    app, locales_dir = Path(sys.argv[1]), Path(sys.argv[2])
+    app, locales_dir, branding = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
     patch_server(app)
+    replace_artwork(app, branding)
     add_switcher(app / "templates")
 
     translate.collect_logic_strings(app)
