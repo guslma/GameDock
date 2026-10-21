@@ -24,15 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Versão do Ownfoil usada como base
+      - name: Versão do GameDock
         id: base
-        run: |
-          echo "version=$(cat UPSTREAM)" >> "$GITHUB_OUTPUT"
-          echo "gamedock=$(cat app/VERSION)" >> "$GITHUB_OUTPUT"
+        run: echo "gamedock=$(cat app/VERSION)" >> "$GITHUB_OUTPUT"
 
       # Primeiro uma imagem só para testar: ela sobe, faz login e abre todas as telas nos 3 idiomas
       - name: Gerar imagem de teste
-        run: docker build --build-arg OWNFOIL_BASE=${{ steps.base.outputs.version }} -t gamedock:test .
+        run: docker build -t gamedock:test .
 
       - name: Testar
         run: tests/smoke.sh gamedock:test
@@ -85,7 +83,6 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7
-          build-args: OWNFOIL_BASE=${{ steps.base.outputs.version }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

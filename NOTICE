@@ -29,9 +29,9 @@ Third-party components shipped in app/static/vendor/, under their own licenses
 - Bootstrap Icons 1.11.1 (https://icons.getbootstrap.com)
 - jQuery 3.6.0 (https://jquery.com)
 
-The Docker image is built on top of the official Ownfoil image
-(a1ex4/ownfoil), which brings the Python runtime and the tools Ownfoil uses;
-their source and licenses are available from the Ownfoil project.
+The Docker image is built from the official Python image (python:alpine) and
+installs the Python packages listed in requirements.lock, each under its own
+license (available from PyPI).
 
 Nintendo Switch is a trademark of Nintendo. GameDock is not affiliated with or
 endorsed by Nintendo, nor by the Ownfoil project.

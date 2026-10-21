@@ -83,7 +83,7 @@ Depois, rode de novo o comando de instalação. Para fixar uma versão, use a ta
 ## Como funciona
 
 - [`app/`](app) é o código do app. Começou do Ownfoil 2.5.0 (o arquivo [`UPSTREAM`](UPSTREAM) diz qual versão) e tem as telas e recursos do GameDock.
-- A imagem usa a oficial do Ownfoil da mesma versão só como base, pelo Python e pelas ferramentas que ela já traz, e troca o código do app pelo do GameDock ([`Dockerfile`](Dockerfile)).
+- A imagem é montada do zero a partir da imagem oficial do Python ([`Dockerfile`](Dockerfile)), com os pacotes de [`requirements.txt`](requirements.txt) nas versões fixas de [`requirements.lock`](requirements.lock). Não depende da imagem do Ownfoil.
 - As telas são escritas em inglês. [`i18n/localize.py`](i18n/localize.py) gera uma cópia delas para cada idioma com os dicionários de [`locales/`](locales), e [`app/gamedock_i18n.py`](app/gamedock_i18n.py) escolhe o idioma de cada acesso. Um texto que o dicionário não conhece continua em inglês, sem quebrar nada.
 - [`tests/smoke.sh`](tests/smoke.sh) sobe a imagem, entra e abre todas as telas nos 3 idiomas. Toda imagem passa por ele antes de ser publicada.
 - [`.github/workflows/ownfoil.yaml`](.github/workflows/ownfoil.yaml) confere todo dia se saiu versão nova do Ownfoil e abre o pedido de atualização. Para ele conseguir abrir pull requests, ligue **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** no repositório; sem isso, ele abre uma issue com o link das mudanças.
