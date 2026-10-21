@@ -5,144 +5,97 @@
 {% include 'nav.html' %}
 <div id="content" class="container-fluid mt-3">
 
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <h1 class="gd-page-title me-auto mb-0">Library</h1>
-        <label class="visually-hidden" for="textFilter">Search titles...</label>
-        <input type="text" id="textFilter" class="form-control" placeholder="Search titles..." style="max-width: 280px">
-        <div class="btn-group" role="group" aria-label="View">
-            <button id="view-toggle-btn-card" type="button" class="btn btn-outline-primary view-toggle-btn active" data-view="card" title="Cards"><i
-                        class="bi bi-card-heading"></i></button>
-                <button id="view-toggle-btn-icon" type="button" class="btn btn-outline-primary view-toggle-btn" data-view="icon" title="Icons"><i
-                        class="bi bi-grid-fill"></i></button>
-                <button id="view-toggle-btn-list" type="button" class="btn btn-outline-primary view-toggle-btn" data-view="list" title="List"><i
-                        class="bi bi-list-ul"></i></button>
-            </div>
-    </div>
-    <p id="libraryStats" class="library-stats mt-0 mb-3 d-none"></p>
-
-    <div class="gd-library-bar mb-3">
-        <label class="gd-field">Show
-            <select class="form-select gd-filter" data-radios="typeAll typeBase typeDlc">
-                <option value="typeAll">Games and DLC</option>
-                <option value="typeBase">Only games</option>
-                <option value="typeDlc">Only DLC</option>
-            </select>
-        </label>
-        <label class="gd-field">From the collection
-            <select class="form-select gd-filter" data-radios="ownershipAll ownershipOwned ownershipMissing">
-                <option value="ownershipAll">All</option>
-                <option value="ownershipOwned">What I have</option>
-                <option value="ownershipMissing">What I do not have</option>
-            </select>
-        </label>
-        <label class="gd-field">Update
-            <select class="form-select gd-filter" data-radios="updateAll updateUpToDate updateMissingUpdate">
-                <option value="updateAll">Any</option>
-                <option value="updateUpToDate">Up to date</option>
-                <option value="updateMissingUpdate">Missing update</option>
-            </select>
-        </label>
-        <label class="gd-field">DLC
-            <select class="form-select gd-filter" data-radios="completionAll completionComplete completionMissingDlc">
-                <option value="completionAll">Any</option>
-                <option value="completionComplete">With every DLC</option>
-                <option value="completionMissingDlc">Missing DLC</option>
-            </select>
-        </label>
-        <div class="gd-field">Per page
-            <div class="btn-group dropdown-center" role="group">
-                <button id="itemsPerPageDropdownBtn" type="button" class="btn btn-outline-secondary dropdown-toggle"
-                    data-bs-toggle="dropdown" aria-expanded="false">
-                    Items per page
+    <div class="gd-lib-head">
+        <div class="gd-lib-title">
+            <h1 class="gd-page-title mb-0">Library</h1>
+            <p id="libraryStats" class="library-stats mb-0 d-none"></p>
+        </div>
+        <div class="gd-lib-tools">
+            <label class="gd-search">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <span class="visually-hidden">Search titles...</span>
+                <input type="text" id="textFilter" placeholder="Search titles...">
+            </label>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary gd-tool" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <i class="bi bi-funnel" aria-hidden="true"></i> Filters <span class="gd-count d-none" id="filterCount"></span>
                 </button>
-                <ul class="dropdown-menu" aria-labelledby="itemsPerPageDropdownBtn">
-                    <li><button class="dropdown-item items-per-page" data-value="9">9</button></li>
-                    <li><button class="dropdown-item items-per-page" data-value="12">12</button></li>
-                    <li><button class="dropdown-item items-per-page" data-value="18">18</button></li>
-                    <li><button class="dropdown-item items-per-page" data-value="27">27</button></li>
-                    <li>
-                        <div class="dropdown-item">
-                            <input type="number" id="customItemsPerPage" class="form-control" placeholder="Custom">
-                            <button id="applyCustomItemsPerPage" class="btn btn-primary mt-2">Apply</button>
+                <div class="dropdown-menu dropdown-menu-end gd-filter-menu">
+                <div class="gd-filter-group">
+                    <div class="gd-filter-label">Show</div>
+                    <div class="btn-group gd-seg" role="group" aria-label="Type filter">
+                        <input type="radio" class="btn-check type-toggle" name="typeFilter" id="typeAll" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="typeAll">All</label>
+                        <input type="radio" class="btn-check type-toggle" name="typeFilter" id="typeBase" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="typeBase">Only games</label>
+                        <input type="radio" class="btn-check type-toggle" name="typeFilter" id="typeDlc" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="typeDlc">Only DLC</label>
+                    </div>
+                </div>
+                <div class="gd-filter-group">
+                    <div class="gd-filter-label">From the collection</div>
+                    <div class="btn-group gd-seg" role="group" aria-label="Ownership filter">
+                        <input type="radio" class="btn-check ownership-toggle" name="ownershipFilter" id="ownershipAll" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="ownershipAll">All</label>
+                        <input type="radio" class="btn-check ownership-toggle" name="ownershipFilter" id="ownershipOwned" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="ownershipOwned">What I have</label>
+                        <input type="radio" class="btn-check ownership-toggle" name="ownershipFilter" id="ownershipMissing" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="ownershipMissing">What I do not have</label>
+                    </div>
+                </div>
+                <div class="gd-filter-group">
+                    <div class="gd-filter-label">Update</div>
+                    <div class="btn-group gd-seg" role="group" aria-label="Update filter">
+                        <input type="radio" class="btn-check update-toggle" name="updateFilter" id="updateAll" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="updateAll">Any</label>
+                        <input type="radio" class="btn-check update-toggle" name="updateFilter" id="updateUpToDate" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="updateUpToDate">Up to date</label>
+                        <input type="radio" class="btn-check update-toggle" name="updateFilter" id="updateMissingUpdate" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="updateMissingUpdate">Missing update</label>
+                    </div>
+                </div>
+                <div class="gd-filter-group">
+                    <div class="gd-filter-label">DLC</div>
+                    <div class="btn-group gd-seg" role="group" aria-label="Completion filter">
+                        <input type="radio" class="btn-check completion-toggle" name="completionFilter" id="completionAll" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="completionAll">Any</label>
+                        <input type="radio" class="btn-check completion-toggle" name="completionFilter" id="completionComplete" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="completionComplete">With every DLC</label>
+                        <input type="radio" class="btn-check completion-toggle" name="completionFilter" id="completionMissingDlc" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="completionMissingDlc">Missing DLC</label>
+                    </div>
+                </div>
+                    <button type="button" class="btn btn-link btn-sm px-0" id="clearFilters">Clear filters</button>
+                </div>
+            </div>
+            <div class="btn-group" role="group" aria-label="View">
+                <button id="view-toggle-btn-card" type="button" class="btn btn-outline-primary view-toggle-btn active" data-view="card" title="Cards" aria-label="Cards"><i class="bi bi-card-heading"></i></button>
+                <button id="view-toggle-btn-icon" type="button" class="btn btn-outline-primary view-toggle-btn" data-view="icon" title="Icons" aria-label="Icons"><i class="bi bi-grid-fill"></i></button>
+                <button id="view-toggle-btn-list" type="button" class="btn btn-outline-primary view-toggle-btn" data-view="list" title="List" aria-label="List"><i class="bi bi-list-ul"></i></button>
+            </div>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary gd-tool" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Display" aria-label="Display">
+                    <i class="bi bi-sliders" aria-hidden="true"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end gd-filter-menu">
+                    <div class="gd-filter-group">
+                        <div class="gd-filter-label">Per page</div>
+                        <div class="btn-group gd-seg" role="group" aria-label="Per page">
+                            <button type="button" class="btn btn-outline-primary btn-sm items-per-page" data-value="12">12</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm items-per-page" data-value="24">24</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm items-per-page" data-value="48">48</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm items-per-page" data-value="96">96</button>
                         </div>
-                    </li>
-                </ul>
+                    </div>
+                    <div class="gd-filter-group mb-0" id="cardSizeGroup">
+                        <label class="gd-filter-label" for="cardSizeRange">Card size</label>
+                        <input type="range" class="form-range" min="1" max="5" step="1" id="cardSizeRange">
+                    </div>
+                </div>
             </div>
         </div>
-        </div>
-        <label class="gd-field ms-md-auto" for="cardSizeRange">Card size
-            <input type="range" class="form-range" min="1" max="5" step="1" id="cardSizeRange" style="width: 160px">
-        </label>
     </div>
-
-    <!-- The filter logic reads these radio groups; the selects above drive them -->
-    <ul class="d-none" aria-hidden="true">
-        <li>
-                            <div class="dropdown-item">
-                                <div class="btn-group w-100" role="group" aria-label="Type filter">
-                                    <input type="radio" class="btn-check type-toggle" name="typeFilter" id="typeAll" autocomplete="off" checked>
-                                    <label class="btn btn-outline-primary" for="typeAll">All</label>
-
-                                    <input type="radio" class="btn-check type-toggle" name="typeFilter" id="typeBase" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="typeBase">Base</label>
-
-                                    <input type="radio" class="btn-check type-toggle" name="typeFilter" id="typeDlc" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="typeDlc">DLC</label>
-                                </div>
-                            </div>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-                        <li>
-                            <div class="dropdown-item">
-                                <div class="btn-group w-100" role="group" aria-label="Ownership filter">
-                                    <input type="radio" class="btn-check ownership-toggle" name="ownershipFilter" id="ownershipAll" autocomplete="off" checked>
-                                    <label class="btn btn-outline-primary" for="ownershipAll">All</label>
-
-                                    <input type="radio" class="btn-check ownership-toggle" name="ownershipFilter" id="ownershipOwned" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="ownershipOwned">Owned</label>
-
-                                    <input type="radio" class="btn-check ownership-toggle" name="ownershipFilter" id="ownershipMissing" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="ownershipMissing">Missing</label>
-                                </div>
-                            </div>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-                        <li>
-                            <div class="dropdown-item">
-                                <div class="btn-group w-100" role="group" aria-label="Update filter">
-                                    <input type="radio" class="btn-check update-toggle" name="updateFilter" id="updateAll" autocomplete="off" checked>
-                                    <label class="btn btn-outline-primary" for="updateAll">All</label>
-
-                                    <input type="radio" class="btn-check update-toggle" name="updateFilter" id="updateUpToDate" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="updateUpToDate">Up to date</label>
-
-                                    <input type="radio" class="btn-check update-toggle" name="updateFilter" id="updateMissingUpdate" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="updateMissingUpdate">Missing Update</label>
-                                </div>
-                            </div>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-                        <li>
-                            <div class="dropdown-item">
-                                <div class="btn-group w-100" role="group" aria-label="Completion filter">
-                                    <input type="radio" class="btn-check completion-toggle" name="completionFilter" id="completionAll" autocomplete="off" checked>
-                                    <label class="btn btn-outline-primary" for="completionAll">All</label>
-
-                                    <input type="radio" class="btn-check completion-toggle" name="completionFilter" id="completionComplete" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="completionComplete">Complete</label>
-
-                                    <input type="radio" class="btn-check completion-toggle" name="completionFilter" id="completionMissingDlc" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="completionMissingDlc">Missing DLC</label>
-                                </div>
-                            </div>
-                        </li>
-                        </ul>
+    <div id="activeFilters" class="gd-chips"></div>
     <div class="grid-container" id="gridContainer">
         <div class="row g-3" id="gameGrid"></div>
         <!-- <div class="row row-cols-1 row-cols-md-3 g-4" id="gameGrid"></div> -->
@@ -831,17 +784,54 @@
     });
 </script>
 <script>
-    // The selects stand for the radio groups the library logic reads
-    $(document).ready(function () {
-        $('.gd-filter').each(function () {
-            const select = $(this);
-            const checked = select.data('radios').split(' ').find(id => $('#' + id).is(':checked'));
-            if (checked) select.val(checked);
-            select.on('change', () => $('#' + select.val()).prop('checked', true).trigger('change'));
+    // Active filters as chips under the toolbar, and their number on the Filters button
+    const FILTER_GROUPS = ['typeFilter', 'ownershipFilter', 'updateFilter', 'completionFilter'];
+
+    function renderFilterChips() {
+        const box = document.getElementById('activeFilters');
+        box.innerHTML = '';
+        let active = 0;
+        FILTER_GROUPS.forEach(name => {
+            const radios = [...document.querySelectorAll(`input[name="${name}"]`)];
+            const checked = radios.find(r => r.checked);
+            if (!checked || checked === radios[0]) return;
+            active++;
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'gd-chip';
+            chip.textContent = document.querySelector(`label[for="${checked.id}"]`).textContent;
+            const x = document.createElement('i');
+            x.className = 'bi bi-x';
+            x.setAttribute('aria-hidden', 'true');
+            chip.append(x);
+            chip.addEventListener('click', () => $(radios[0]).prop('checked', true).trigger('change'));
+            box.append(chip);
         });
-        // The per-page button shows the current number; its label sits above it
-        $('#itemsPerPageDropdownBtn').text(itemsPerPage);
-        $('.items-per-page, #applyCustomItemsPerPage').on('click', () => setTimeout(() => $('#itemsPerPageDropdownBtn').text(itemsPerPage)));
+        const count = document.getElementById('filterCount');
+        count.textContent = active;
+        count.classList.toggle('d-none', !active);
+    }
+
+    function markItemsPerPage() {
+        $('.items-per-page').each(function () {
+            $(this).toggleClass('active', $(this).data('value') == itemsPerPage);
+        });
+    }
+
+    $(document).ready(function () {
+        renderFilterChips();
+        markItemsPerPage();
+        $('.type-toggle, .ownership-toggle, .update-toggle, .completion-toggle').on('change', renderFilterChips);
+        $('.items-per-page').on('click', () => setTimeout(markItemsPerPage));
+        $('#clearFilters').on('click', () => {
+            FILTER_GROUPS.forEach(name => { document.querySelector(`input[name="${name}"]`).checked = true; });
+            onFilterChange();
+            renderFilterChips();
+        });
+        // Card size only applies to cards and icons
+        const syncCardSize = () => $('#cardSizeGroup').toggleClass('d-none', currentView === 'list');
+        syncCardSize();
+        $('.view-toggle-btn').on('click', () => setTimeout(syncCardSize));
     });
 </script>
 {% endblock %}

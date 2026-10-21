@@ -228,3 +228,38 @@ body { background: var(--gd-bg); }
 .gd-clients .gd-card { margin-bottom: 0; }
 
 code { color: #C9C0FF; }
+
+/* ---- Library toolbar ---- */
+.gd-lib-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; margin-bottom: 12px; }
+.gd-lib-title { margin-right: auto; min-width: 0; }
+.gd-lib-title .library-stats { margin-top: 2px; font-size: .9rem; }
+.gd-lib-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gd-search {
+    display: flex; align-items: center; gap: 8px; margin: 0;
+    background: var(--gd-surface); border: 1px solid #2E333D; border-radius: 10px;
+    padding: 0 12px; height: 40px; width: 260px; max-width: 100%;
+}
+.gd-search:focus-within { border-color: var(--gd-brand-1); box-shadow: 0 0 0 .2rem rgba(123, 92, 255, .25); }
+.gd-search .bi { color: var(--gd-muted); }
+.gd-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--gd-text); }
+.gd-tool { height: 40px; display: inline-flex; align-items: center; gap: 6px; }
+.gd-lib-tools .view-toggle-btn { height: 40px; }
+.gd-count {
+    background: var(--gd-accent); color: #fff; border-radius: 999px;
+    font-size: .72rem; font-weight: 700; min-width: 20px; height: 20px; padding: 0 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.gd-filter-menu { padding: 16px; min-width: 300px; }
+.gd-filter-group { margin-bottom: 14px; }
+.gd-filter-label { display: block; color: var(--gd-muted); font-size: .78rem; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .03em; }
+.gd-seg { display: flex; width: 100%; }
+.gd-seg .btn { flex: 1; white-space: nowrap; }
+.gd-seg .btn.active, .gd-seg .btn-check:checked + .btn { background: var(--gd-accent); border-color: var(--gd-accent); color: #fff; }
+.gd-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.gd-chips:empty { display: none; }
+.gd-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--gd-accent-soft); color: #D9D2FF; border: 1px solid #3A3463;
+    border-radius: 999px; padding: 4px 8px 4px 12px; font-size: .85rem;
+}
+.gd-chip:hover { border-color: var(--gd-brand-1); color: #fff; }
