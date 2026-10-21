@@ -1,0 +1,42 @@
+                <!-- Edit User Modal (GameDock) -->
+                <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel"
+                    aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h1 class="modal-title fs-5" id="editUserModalLabel">Edit user</h1>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="inputEditUser" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="inputEditUser" autocomplete="off">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="inputEditUserPassword" class="form-label">New password</label>
+                                    <input type="password" class="form-control" id="inputEditUserPassword"
+                                        autocomplete="new-password" placeholder="Leave blank to keep the current password">
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="checkboxEditUserShopAccess">
+                                    <label class="form-check-label" for="checkboxEditUserShopAccess">Shop Access</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="checkboxEditUserBackupAccess">
+                                    <label class="form-check-label" for="checkboxEditUserBackupAccess">Backup Access</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="checkboxEditUserAdminAccess">
+                                    <label class="form-check-label" for="checkboxEditUserAdminAccess">Admin Access</label>
+                                </div>
+                                <div class="alert alert-warning mt-3 mb-0 d-none" id="editUserError"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-primary" onclick="saveEditUser()">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+

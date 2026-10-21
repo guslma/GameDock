@@ -10,10 +10,11 @@
 
 O GameDock organiza os seus jogos de Nintendo Switch e os serve na rede para o Tinfoil, o Sphaira e outros clientes: biblioteca com capas, verificação dos arquivos, compressão, organização automática e estatísticas.
 
-Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e funciona igual a ele. As diferenças são o nome e a interface em vários idiomas:
+Ele é baseado no [Ownfoil](https://github.com/a1ex4/ownfoil) e funciona igual a ele. As diferenças são o nome, a interface em vários idiomas e alguns recursos a mais:
 
 - **Idioma automático:** cada pessoa vê o idioma do próprio navegador.
 - **Seletor no menu:** dá para trocar de idioma a qualquer momento, e a escolha fica salva no navegador.
+- **Edição de usuários:** em **Admin → Configurações**, o botão de lápis de cada usuário (desativado no Ownfoil) permite mudar o nome, a senha e as permissões.
 - **Sempre atualizado:** todo dia uma verificação confere se saiu versão nova do Ownfoil. Quando sai, a imagem do GameDock dessa versão é gerada e publicada sozinha.
 
 ## Como instalar

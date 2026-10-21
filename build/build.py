@@ -8,6 +8,8 @@
    plus English, in templates/<code>/ and static/js/<code>/.
 3. Runtime: gamedock_i18n.py picks the language of each request and the menu gets a
    language switcher.
+4. Users: the edit button of each user, disabled in Ownfoil, opens a form that saves
+   through gamedock_users.py.
 
 Every change looks for an exact piece of the official code and stops the build when it
 is gone, so a new Ownfoil version can never ship half patched.
@@ -47,11 +49,13 @@ def branded(text):
 
 def patch_server(app):
     patch(app / "app.py", "app = create_app()\n",
-          "app = create_app()\nimport gamedock_i18n\ngamedock_i18n.install(app)\n")
+          "app = create_app()\nimport gamedock_i18n\ngamedock_i18n.install(app)\n"
+          "import gamedock_users\ngamedock_users.install(app)\n")
     patch(app / "app.py", "or 'Ownfoil'}", f"or '{BRAND}'}}")
     patch(app / "constants.py", '"name": "Ownfoil",', f'"name": "{BRAND}",')
     patch(app / "auth.py", 'realm="Ownfoil"', f'realm="{BRAND}"')
     shutil.copy(HERE / "gamedock_i18n.py", app / "gamedock_i18n.py")
+    shutil.copy(HERE / "gamedock_users.py", app / "gamedock_users.py")
 
 
 def replace_artwork(app, branding):
@@ -64,6 +68,19 @@ def replace_artwork(app, branding):
         if not target.exists():
             sys.exit(f"static/{relative}: not in Ownfoil anymore; Ownfoil changed")
         shutil.copy(source, target)
+
+
+def add_user_editing(templates):
+    """Ownfoil shows the edit button of each user disabled; GameDock makes it work."""
+    settings = templates / "settings.html"
+    patch(settings,
+          """'<button type="button" class="btn btn-outline-info btn-sm" disabled=""><i class="bi bi-pencil-square"></i></button> ' +""",
+          """'<button type="button" class="btn btn-outline-info btn-sm" onclick="openEditUser(' + user['id'] + ')"><i class="bi bi-pencil-square" title="Edit user"></i></button> ' +""")
+    patch(settings, '                <hr class="hr-settings">\n\n                <h2>Library</h2>',
+          (HERE / "edit_user.html").read_text(encoding="utf-8")
+          + '                <hr class="hr-settings">\n\n                <h2>Library</h2>')
+    patch(settings, "    function submitNewUser() {",
+          (HERE / "edit_user.js").read_text(encoding="utf-8") + "    function submitNewUser() {")
 
 
 def add_switcher(templates):
@@ -127,6 +144,7 @@ def main():
     app, locales_dir, branding = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
     patch_server(app)
     replace_artwork(app, branding)
+    add_user_editing(app / "templates")
     add_switcher(app / "templates")
 
     translate.collect_logic_strings(app)
