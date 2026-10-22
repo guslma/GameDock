@@ -143,6 +143,9 @@ body { background: var(--gd-bg); }
 
 /* ---- Top bar: brand, the sections in the middle, language / about / logout on the right ---- */
 html { overflow-y: scroll; }  /* short and long pages keep the centered menu in place */
+/* With the scrollbar always there, Bootstrap's padding for a missing scrollbar while a
+   popup is open would push the page sideways instead */
+body.modal-open { padding-right: 0 !important; }
 .gd-topbar {
     background: rgba(17, 19, 23, .9);
     backdrop-filter: blur(14px);
