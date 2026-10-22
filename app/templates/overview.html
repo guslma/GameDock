@@ -35,12 +35,9 @@
         <div class="task-scroll">
             <ul id="queueTasks" class="task-list"></ul>
         </div>
-        <p id="queueEmpty" class="text-secondary mb-0">Nothing running. GameDock is idle.</p>
+        <p id="queueEmpty" class="text-secondary mb-0">No task in progress right now.</p>
         <p id="queueTruncated" class="text-secondary fst-italic d-none">
             Showing the {{ max_tasks }} oldest tasks — more are queued behind them.</p>
-        <h3 class="h6 mt-4 mb-2 text-secondary">Next</h3>
-        <ul id="scheduledTasks" class="task-list"></ul>
-        <p id="scheduledEmpty" class="text-secondary fst-italic mb-0">Nothing scheduled.</p>
     </section>
 
     <section class="gd-card">
@@ -510,6 +507,37 @@
     // finishes, so it sits here as `completed` for as long as its siblings run. Without
     // this it falls through every branch below to "still running", and a parent fanning out
     // slow children shows a stack of spinners that look like they beat the concurrency cap.
+    // GameDock: a scheduled task reads as "today at 20:02 · in 11h 42m" rather than a
+    // full timestamp, which looked like an error report.
+    const SCHEDULED_SHOWN_MS = 15 * 60 * 1000;
+    const todayAt = 'today at';
+    const tomorrowAt = 'tomorrow at';
+
+    function scheduledWhen(iso) {
+        const when = new Date(iso);
+        const time = when.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        const days = Math.round((new Date(when).setHours(0, 0, 0, 0) - new Date(clockNow()).setHours(0, 0, 0, 0)) / 86400000);
+        const day = days === 0 ? `${todayAt} ${time}`
+            : days === 1 ? `${tomorrowAt} ${time}`
+            : when.toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+        return `${day} · ${relativeTime(iso)}`;
+    }
+
+    // GameDock: names for the tasks people see on their own, in words that say what they do.
+    const TASK_LABELS = {
+        update_titledb: 'Update the game catalogue',
+        scan_libraries: 'Look for new files in the library',
+        process_library: 'Process library files',
+        download_media: 'Download covers',
+        update_titles: 'Update game information',
+        add_missing_apps: 'Look for missing content',
+        remove_missing_files: 'Remove files that are gone',
+        startup: 'Starting',
+    };
+    const TASK_HINTS = {
+        update_titledb: 'Downloads names, covers and new versions of the games',
+    };
+
     function isFinished(task) {
         return task.done || task.status === 'completed';
     }
@@ -518,9 +546,7 @@
         if (task.cancelled) return 'cancelled';
         if (isFinished(task)) return 'finished';
         if (task.status === 'failed') return task.errorMessage || 'failed';
-        if (task.runAfter) {
-            return `${new Date(task.runAfter).toLocaleString()} — ${relativeTime(task.runAfter)}`;
-        }
+        if (task.runAfter) return scheduledWhen(task.runAfter);
         if (!task.startedAt) return '';
 
         const elapsed = clockNow() - new Date(task.startedAt).getTime();
@@ -538,6 +564,7 @@
         done:      '<i class="bi bi-check-circle-fill text-success"></i>',
         failed:    '<i class="bi bi-exclamation-circle-fill text-danger"></i>',
         pending:   '<i class="bi bi-hourglass-split text-secondary"></i>',
+        scheduled: '<i class="bi bi-clock text-secondary"></i>',
         running:   '<i class="bi bi-arrow-repeat spin text-info"></i>',
     };
 
@@ -545,7 +572,7 @@
         if (task.cancelled) return 'cancelled';
         if (isFinished(task)) return 'done';
         if (task.status === 'failed') return 'failed';
-        if (task.status === 'pending') return 'pending';
+        if (task.status === 'pending') return task.runAfter ? 'scheduled' : 'pending';
         return 'running';
     }
 
@@ -609,7 +636,9 @@
             icon.innerHTML = ICONS[iconKey];
         }
 
-        own('.task-head > .task-name').textContent = task.displayName;
+        const name = own('.task-head > .task-name');
+        name.textContent = TASK_LABELS[task.taskName] || task.displayName;
+        name.title = TASK_HINTS[task.taskName] || '';
         own('.task-head > .task-meta').textContent = taskMeta(task);
 
         // Only a live row carries a bar: a queued one has nothing to report yet, and a
@@ -630,7 +659,9 @@
         // its parent is counting. On a failed row it stays, as the only way to clear a
         // failure.
         const cancel = own('.task-head > .task-cancel');
-        cancel.classList.toggle('d-none', isFinished(task));
+        // GameDock: a scheduled row loses it too. The cross read as an error there, and
+        // the schedule itself is changed in Settings, not by dropping the next run.
+        cancel.classList.toggle('d-none', isFinished(task) || (task.status === 'pending' && !!task.runAfter));
         cancel.title = task.status === 'failed' ? 'Dismiss' : 'Cancel';
     }
 
@@ -711,10 +742,10 @@
             .sort(queueOrder);
 
         // Running and pending share one list, under the rows that just finished.
+        // GameDock: a scheduled task (the daily catalogue update) only joins it in its last
+        // minutes: "Now" is for work being done, not a countdown to something already set.
         section('queueTasks', 'queueEmpty', roots.filter(
-            t => t.status !== 'failed' && !t.runAfter));
-        section('scheduledTasks', 'scheduledEmpty', roots.filter(
-            t => t.status === 'pending' && t.runAfter));
+            t => t.status !== 'failed' && (!t.runAfter || new Date(t.runAfter).getTime() - clockNow() <= SCHEDULED_SHOWN_MS)));
         const failed = roots.filter(t => t.status === 'failed');
         section('failedTasks', 'failedEmpty', failed);
         document.getElementById('purgeFailed').classList.toggle('d-none', !failed.length);

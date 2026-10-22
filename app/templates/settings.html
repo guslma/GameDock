@@ -575,10 +575,19 @@
                     <section class="gd-card">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="titledbUpdateIntervalInput" class="form-label">Update the game catalogue every</label>
-                                <input type="text" class="form-control" id="titledbUpdateIntervalInput" aria-describedby="titledbUpdateIntervalHelp" placeholder="12h">
+                                <label for="titledbScheduleSelect" class="form-label">Update the game catalogue</label>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select w-auto" id="titledbScheduleSelect" onchange="showTitledbSchedule()">
+                                        <option value="daily">Every day at</option>
+                                        <option value="interval">Every</option>
+                                        <option value="off">Never</option>
+                                    </select>
+                                    <input type="time" class="form-control" id="titledbUpdateTimeInput" value="06:00" aria-label="Time">
+                                    <input type="text" class="form-control" id="titledbUpdateIntervalInput" aria-describedby="titledbUpdateIntervalHelp" placeholder="12h" aria-label="Interval">
+                                </div>
                                 <div id="titledbUpdateIntervalFeedback"></div>
-                                <div id="titledbUpdateIntervalHelp" class="form-text">A number and a unit, like 30m, 12h or 1d. 0 turns it off.</div>
+                                <div id="titledbUpdateTimeHelp" class="form-text">Once a day, at this time on the server clock.</div>
+                                <div id="titledbUpdateIntervalHelp" class="form-text">A number and a unit, like 30m, 12h or 1d.</div>
                             </div>
                             <div class="col-md-6">
                                 <label for="workerCountInput" class="form-label">Worker processes</label>
@@ -1712,10 +1721,21 @@
         });
     }
 
+    // GameDock: the catalogue updates daily at a set time, on an interval, or never.
+    function showTitledbSchedule() {
+        const mode = $('#titledbScheduleSelect').val();
+        $('#titledbUpdateTimeInput, #titledbUpdateTimeHelp').toggleClass('d-none', mode !== 'daily');
+        $('#titledbUpdateIntervalInput, #titledbUpdateIntervalHelp').toggleClass('d-none', mode !== 'interval');
+    }
+
     function submitSchedulerSettings() {
         $('#submitSchedulerSettingsBtn').prop('disabled', true);
+        const mode = $('#titledbScheduleSelect').val();
+        let interval = getInputVal("titledbUpdateIntervalInput").trim();
+        if (mode !== 'interval' && (!interval || interval === '0')) interval = '12h';
         data = {
-            titledb_update_interval: getInputVal("titledbUpdateIntervalInput").trim()
+            titledb_update_interval: mode === 'off' ? '0' : interval,
+            titledb_update_time: mode === 'daily' ? (getInputVal("titledbUpdateTimeInput") || '06:00') : ''
         }
 
         $.ajax({
@@ -1728,7 +1748,7 @@
                     console.log('Not Success!');
                     if (result['errors']) {
                         result['errors'].forEach(error => {
-                            if (error['path'] === 'scheduler/titledb_update_interval') {
+                            if (error['path'] === 'scheduler/titledb_update_interval' || error['path'] === 'scheduler/titledb_update_time') {
                                 $('#titledbUpdateIntervalFeedback').text(error['error']);
                                 $('#titledbUpdateIntervalFeedback').addClass('invalid-feedback d-block');
                                 $("#titledbUpdateIntervalInput").removeClass('is-valid');
@@ -1892,7 +1912,12 @@
             // Scheduler settings
             schedulerSettings = result['scheduler'];
             if (schedulerSettings && schedulerSettings['titledb_update_interval'] !== undefined) {
-                setInputVal("titledbUpdateIntervalInput", schedulerSettings['titledb_update_interval']);
+                const interval = schedulerSettings['titledb_update_interval'];
+                const time = schedulerSettings['titledb_update_time'];
+                setInputVal("titledbUpdateIntervalInput", interval === '0' ? '' : interval);
+                if (time) setInputVal("titledbUpdateTimeInput", time);
+                $('#titledbScheduleSelect').val(time ? 'daily' : interval === '0' ? 'off' : 'interval');
+                showTitledbSchedule();
             }
 
             // Worker settings

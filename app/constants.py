@@ -105,6 +105,9 @@ DEFAULT_SETTINGS = {
     },
     "scheduler": {
         "titledb_update_interval": "12h",
+        # GameDock: "HH:MM" updates the catalogue once a day at that time (server time zone),
+        # in place of the interval. Empty keeps the interval.
+        "titledb_update_time": "",
     },
     "worker": {
         "count": 2,

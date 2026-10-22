@@ -619,10 +619,24 @@ def update_titledb_task(**kwargs):
         update_scheduled_task('update_titledb', datetime.datetime.utcnow() + TITLEDB_RETRY_DELAY)
         raise
     # Re-enqueue for next scheduled run
-    interval_str = settings.get('scheduler', {}).get('titledb_update_interval', '12h')
-    delta = interval_string_to_timedelta(interval_str)
-    if delta:
-        update_scheduled_task('update_titledb', datetime.datetime.utcnow() + delta)
+    next_run = next_titledb_run(settings.get('scheduler', {}))
+    if next_run:
+        update_scheduled_task('update_titledb', next_run)
+
+
+def next_titledb_run(scheduler):
+    """GameDock: when the catalogue updates next, in UTC: daily at the set local time, or
+    after the interval. None when both are off."""
+    at = scheduler.get('titledb_update_time')
+    if at:
+        hour, minute = (int(part) for part in at.split(':'))
+        now = datetime.datetime.now()
+        when = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if when <= now:
+            when += datetime.timedelta(days=1)
+        return when.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+    delta = interval_string_to_timedelta(scheduler.get('titledb_update_interval', '12h'))
+    return datetime.datetime.utcnow() + delta if delta else None
 
 
 # --- Scan pipeline ---

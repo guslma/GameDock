@@ -1,4 +1,5 @@
 import datetime
+import re
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory, Response, abort
 from flask_login import LoginManager
 from flask_sock import Sock
@@ -600,7 +601,6 @@ def set_library_management_settings_api():
 @app.post('/api/settings/scheduler')
 @access_required('admin')
 def set_scheduler_settings_api():
-    from utils import interval_string_to_timedelta
     data = request.json
     titledb_update_interval_str = data.get('titledb_update_interval')
 
@@ -612,12 +612,18 @@ def set_scheduler_settings_api():
                 'errors': [{'path': 'scheduler/titledb_update_interval', 'error': error_msg}]
             })
 
+    titledb_update_time = data.get('titledb_update_time')
+    if titledb_update_time and not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', titledb_update_time):
+        return jsonify({
+            'success': False,
+            'errors': [{'path': 'scheduler/titledb_update_time', 'error': 'Time must be HH:MM, like 06:00'}]
+        })
+
     set_scheduler_settings(data)
 
-    if titledb_update_interval_str is not None:
-        delta = interval_string_to_timedelta(titledb_update_interval_str)
-        run_after = datetime.datetime.utcnow() + delta if delta else None
-        tasks_mod.update_scheduled_task('update_titledb', run_after)
+    if titledb_update_interval_str is not None or titledb_update_time is not None:
+        tasks_mod.update_scheduled_task('update_titledb',
+                                        tasks_mod.next_titledb_run(get_settings()['scheduler']))
 
     return jsonify({'success': True, 'errors': []})
 
