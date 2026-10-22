@@ -47,6 +47,7 @@
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="downloadClear"><i class="bi bi-trash" aria-hidden="true"></i> Clear history</button>
                     </div>
                     <div id="downloadUsers" class="gd-dl-users"></div>
+                    <div id="downloadConsoles" class="gd-dl-consoles d-none"></div>
                     <div id="downloadRows" class="gd-dl-list"></div>
                     <p id="downloadEmpty" class="text-secondary mb-0 d-none"></p>
                 </div>
@@ -136,6 +137,10 @@
         title: 'Downloads', all: 'Everyone', noUser: 'No user', count: 'Downloads:', last: 'Last:',
         game: 'Game', update: 'Update', dlc: 'DLC', browser: 'Browser',
         noneYet: 'None recorded yet', open: 'Click to see who downloaded what',
+        consoles: 'Consoles:', console: 'Console', shared: 'Shared logins:',
+        consolesOf: 'Consoles that used this login', firstSeen: 'First:', accesses: 'Accesses:',
+        consolesHelp: 'Tinfoil and CyberFoil send an id of the console. Sphaira does not, so it shows as one unidentified entry and is not counted as another console.',
+        unidentified: 'Unidentified console',
         empty: 'No downloads recorded yet. They show up here from now on.',
         noMatch: 'No download matches the search.',
         confirmClear: 'Clear the whole download history?',
@@ -179,10 +184,12 @@
         note.className = 'stat-note';
         if (dlSummary) {
             const total = dlSummary.reduce((sum, u) => sum + u.count, 0);
-            const last = dlSummary.reduce((max, u) => (u.last > max ? u.last : max), '');
+            const last = dlSummary.reduce((max, u) => ((u.last || '') > max ? u.last : max), '');
             value.textContent = total;
             const short = last ? new Date(last).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '';
-            note.textContent = total ? `${DL_TEXT.last} ${short}` : DL_TEXT.noneYet;
+            const shared = dlSummary.filter(u => (u.consoles || []).filter(c => c.identified).length > 1).length;
+            note.textContent = shared ? `⚠ ${DL_TEXT.shared} ${shared}` : (total ? `${DL_TEXT.last} ${short}` : DL_TEXT.noneYet);
+            note.classList.toggle('gd-dl-warn', shared > 0);
         } else {
             value.textContent = '—';
         }
@@ -219,10 +226,43 @@
             const meta = document.createElement('span');
             meta.textContent = `${DL_TEXT.count} ${u.count}` + (u.last ? ` · ${dlSize(u.size)} · ${DL_TEXT.last} ${dlDate(u.last)}` : '');
             card.append(name, meta);
+            const consoles = (u.consoles || []).filter(c => c.identified).length;
+            if (consoles > 1) {
+                const badge = document.createElement('span');
+                badge.className = 'gd-pill gd-pill-warn gd-dl-badge';
+                badge.textContent = `⚠ ${DL_TEXT.consoles} ${consoles}`;
+                card.append(badge);
+                card.classList.add('gd-dl-shared');
+            }
             card.addEventListener('click', () => { dlUser = key; loadDownloads(); });
             cards.append(card);
         });
         cards.classList.toggle('d-none', !data.users.length);
+
+        const chosen = data.users.find(u => dlUser !== '*' && (u.user || '') === dlUser);
+        const box = document.getElementById('downloadConsoles');
+        box.innerHTML = '';
+        if (chosen && (chosen.consoles || []).length) {
+            const head = document.createElement('div');
+            head.className = 'gd-dl-consoles-head';
+            head.textContent = DL_TEXT.consolesOf;
+            box.append(head);
+            chosen.consoles.forEach(c => {
+                const line = document.createElement('div');
+                line.className = 'gd-dl-console';
+                const id = document.createElement('strong');
+                id.textContent = c.identified ? `${DL_TEXT.console} ${c.console}` : DL_TEXT.unidentified;
+                const info = document.createElement('span');
+                info.textContent = `${c.client || '—'} · ${DL_TEXT.firstSeen} ${dlDate(c.first_seen)} · ${DL_TEXT.last} ${dlDate(c.last_seen)} · ${DL_TEXT.accesses} ${c.accesses}`;
+                line.append(id, info);
+                box.append(line);
+            });
+            const help = document.createElement('div');
+            help.className = 'form-text mt-1';
+            help.textContent = DL_TEXT.consolesHelp;
+            box.append(help);
+        }
+        box.classList.toggle('d-none', !box.childElementCount);
 
         const list = document.getElementById('downloadRows');
         list.innerHTML = '';
@@ -241,7 +281,8 @@
             name.title = row.filename;
             const line = document.createElement('div');
             line.className = 'gd-missing-line';
-            line.textContent = [dlWhat(row), row.client === 'Browser' ? DL_TEXT.browser : row.client, dlSize(row.size)].filter(Boolean).join(' · ');
+            line.textContent = [dlWhat(row), row.client === 'Browser' ? DL_TEXT.browser : row.client,
+                row.console ? `${DL_TEXT.console} ${row.console}` : '', dlSize(row.size)].filter(Boolean).join(' · ');
             text.append(name, line);
             const side = document.createElement('div');
             side.className = 'gd-dl-side';

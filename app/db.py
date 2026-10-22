@@ -802,6 +802,10 @@ def send_library_file(filepath):
     # them, and a range past the end of the file raises out of here without transferring.
     response = send_from_directory(filedir, filename)
     increment_download_count_throttled(filepath, client_address(request))
+    # GameDock: the download history, for every app (Tinfoil and CyberFoil through
+    # /api/download, Sphaira through its own listing)
+    import gamedock_downloads
+    gamedock_downloads.record(request, filepath)
     return response
 
 

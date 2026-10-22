@@ -872,5 +872,15 @@
  "Last:": "Último:",
  "Tidy up the library": "Arrumar a biblioteca",
  "None recorded yet": "Nenhum registrado ainda",
- "Click to see who downloaded what": "Clique para ver quem baixou o quê"
+ "Click to see who downloaded what": "Clique para ver quem baixou o quê",
+ "Consoles:": "Consoles:",
+ "Console": "Console",
+ "Consoles that used this login": "Consoles que usaram esta conta",
+ "First:": "Primeiro:",
+ "Accesses:": "Acessos:",
+ "Account on another console": "Conta em outro console",
+ "A user's login was used on a console it had not been used on before (Tinfoil and CyberFoil).": "O login de um usuário foi usado num console em que nunca tinha sido usado antes (Tinfoil e CyberFoil).",
+ "Shared logins:": "Contas compartilhadas:",
+ "Tinfoil and CyberFoil send an id of the console. Sphaira does not, so it shows as one unidentified entry and is not counted as another console.": "O Tinfoil e o CyberFoil mandam um identificador do console. O Sphaira não manda, então aparece como um console sem identificação e não conta como outro console.",
+ "Unidentified console": "Console sem identificação"
 }

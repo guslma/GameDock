@@ -29,7 +29,7 @@ SYSTEM_FILE = Path(CONFIG_DIR) / "gamedock.json"
 CHECK_EVERY = 60
 _lock = threading.Lock()
 
-EVENTS = ("new_content", "missing_content", "verification", "task_failed")
+EVENTS = ("new_content", "missing_content", "verification", "task_failed", "new_console")
 DEFAULTS = {
     "provider": "",
     "ntfy_url": "",
@@ -152,6 +152,8 @@ TEXTS = {
         "test": "Notifications are working.", "game": "game", "update": "update", "dlc": "DLC",
         "update_n": "update {n} (released {date})", "verify_line": "{name}: the file is corrupted or modified",
         "and_more": "and {n} more",
+        "console_title": "Account used on another console",
+        "console_line": "{user} was used on a new console ({console}, {client}). It is now on {n} consoles.",
     },
     "pt-BR": {
         "new_title": "Novo na biblioteca", "missing_title": "Novidade disponível",
@@ -159,6 +161,8 @@ TEXTS = {
         "test": "Os avisos estão funcionando.", "game": "jogo", "update": "atualização", "dlc": "DLC",
         "update_n": "atualização {n} (lançada em {date})", "verify_line": "{name}: o arquivo está corrompido ou modificado",
         "and_more": "e mais {n}",
+        "console_title": "Conta usada em outro console",
+        "console_line": "{user} foi usada num console novo ({console}, {client}). Agora está em {n} consoles.",
     },
     "es": {
         "new_title": "Nuevo en la biblioteca", "missing_title": "Novedad disponible",
@@ -166,6 +170,8 @@ TEXTS = {
         "test": "Los avisos funcionan.", "game": "juego", "update": "actualización", "dlc": "DLC",
         "update_n": "actualización {n} (publicada el {date})", "verify_line": "{name}: el archivo está dañado o modificado",
         "and_more": "y {n} más",
+        "console_title": "Cuenta usada en otra consola",
+        "console_line": "{user} se usó en una consola nueva ({console}, {client}). Ahora está en {n} consolas.",
     },
 }
 
@@ -230,6 +236,16 @@ def send(title, message, settings=None):
     except Exception as e:  # the service answered with an error or could not be reached
         return str(e)[:200]
     return None
+
+
+def notify_new_console(user, console, client, count):
+    """A login showed up on one more console than before. Sent right away, off the request."""
+    settings = get_notify_settings()
+    if not settings["provider"] or not settings["events"].get("new_console"):
+        return
+    t = _texts()
+    message = t["console_line"].format(user=user, console=console, client=client or "?", n=count)
+    threading.Thread(target=send, args=(t["console_title"], message, settings), daemon=True).start()
 
 
 # --- what changed since the last look -----------------------------------------------------------

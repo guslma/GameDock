@@ -315,7 +315,11 @@ def index(path=None):
 
         # Handle client request
         logger.info(f"{client.CLIENT_NAME} connection from {request.remote_addr}")
-        return client.handle_request(request)
+        response = client.handle_request(request)
+        # The client answers errors with a 200 too: what counts is whether the login checked out
+        if getattr(request, 'basic_auth_success', False):
+            gamedock_downloads.seen(request, client.CLIENT_NAME, verified=True)
+        return response
 
     # Browser request - serve web UI
     elif path:
@@ -743,6 +747,4 @@ def download_file(token):
     filepath = db.session.query(Files.filepath).filter_by(download_token=token).scalar()
     if not filepath:
         return jsonify({'error': 'No file with that token.'}), 404
-    response = send_library_file(filepath)
-    gamedock_downloads.record(request, filepath)
-    return response
+    return send_library_file(filepath)
