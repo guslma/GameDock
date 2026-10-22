@@ -806,7 +806,7 @@ def send_library_file(filepath):
     # /api/download, Sphaira through its own listing)
     import gamedock_downloads
     gamedock_downloads.record(request, filepath)
-    return response
+    return gamedock_downloads.track(request, filepath, response)
 
 
 def reset_files_organized():

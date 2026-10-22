@@ -12,6 +12,12 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav gd-menu mx-lg-auto">
+                {% if gd_admin %}
+                <li class="nav-item">
+                    <a class="nav-link{% if gd_path == '/admin' %} active" aria-current="page{% endif %}" href="/admin">
+                        <i class="bi bi-speedometer2" aria-hidden="true"></i> Overview</a>
+                </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link{% if gd_path == '/' or gd_path.startswith('/title') %} active" aria-current="page{% endif %}" href="/">
                         <i class="bi bi-grid" aria-hidden="true"></i> Library</a>
@@ -23,10 +29,6 @@
                 </li>
                 {% endif %}
                 {% if gd_admin %}
-                <li class="nav-item">
-                    <a class="nav-link{% if gd_path == '/admin' %} active" aria-current="page{% endif %}" href="/admin">
-                        <i class="bi bi-speedometer2" aria-hidden="true"></i> Overview</a>
-                </li>
                 <li class="nav-item">
                     <a class="nav-link{% if gd_path.startswith('/admin/files') %} active" aria-current="page{% endif %}" href="/admin/files">
                         <i class="bi bi-folder2" aria-hidden="true"></i> Files</a>

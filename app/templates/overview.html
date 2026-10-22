@@ -57,6 +57,7 @@
 
     <section class="gd-card">
         <h2 class="h5 mb-3">Now</h2>
+        <ul id="transferList" class="task-list"></ul>
         <div class="task-scroll">
             <ul id="queueTasks" class="task-list"></ul>
         </div>
@@ -131,6 +132,77 @@
 {% endblock %}
 
 {% block panel_scripts %}
+<script>
+    // Overview > Now: downloads streaming to a console right now, with their progress
+    const TR_TEXT = {
+        done: 'Finished', stalled: 'Paused', left: 'Time left:',
+        game: 'Game', update: 'Update', dlc: 'DLC', noUser: 'No user',
+    };
+
+    function nowEmpty() {
+        const busy = document.getElementById('queueTasks').childElementCount + document.getElementById('transferList').childElementCount;
+        document.getElementById('queueEmpty').classList.toggle('d-none', busy > 0);
+    }
+
+    function trSize(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+        return `${bytes.toFixed(i > 2 ? 1 : 0)} ${units[i]}`;
+    }
+
+    function trWhat(t) {
+        if (t.app_type === 'UPDATE') return t.version ? `${TR_TEXT.update} ${t.version}` : TR_TEXT.update;
+        if (t.app_type === 'DLC') return t.app_name ? `${TR_TEXT.dlc}: ${t.app_name}` : TR_TEXT.dlc;
+        return TR_TEXT.game;
+    }
+
+    async function loadTransfers() {
+        let data;
+        try {
+            data = await (await fetch('/api/gamedock/transfers', {credentials: 'same-origin'})).json();
+        } catch (e) {
+            return;
+        }
+        const list = document.getElementById('transferList');
+        list.innerHTML = '';
+        data.transfers.forEach(t => {
+            const li = document.createElement('li');
+            li.className = 'task-row gd-transfer' + (t.done ? ' task-done' : '');
+            const head = document.createElement('div');
+            head.className = 'task-head';
+            const icon = document.createElement('span');
+            icon.className = 'task-icon';
+            icon.innerHTML = t.done ? '<i class="bi bi-check-circle-fill text-success"></i>'
+                : t.stalled ? '<i class="bi bi-pause-circle text-secondary"></i>'
+                : '<i class="bi bi-download text-info"></i>';
+            const name = document.createElement('span');
+            name.className = 'task-name';
+            name.textContent = `${t.user || TR_TEXT.noUser} · ${t.title_name} (${trWhat(t)})`;
+            const meta = document.createElement('span');
+            meta.className = 'task-meta text-secondary';
+            const parts = [`${t.percent}%`, `${trSize(t.reached)} / ${trSize(t.size)}`];
+            if (t.done) parts.push(TR_TEXT.done);
+            else if (t.stalled) parts.push(TR_TEXT.stalled);
+            else {
+                parts.push(`${trSize(t.speed)}/s`);
+                if (t.eta != null) parts.push(`${TR_TEXT.left} ${humanizeDuration(t.eta * 1000)}`);
+            }
+            if (t.client) parts.push(t.client);
+            meta.textContent = parts.join(' · ');
+            head.append(icon, name, meta);
+            const bar = document.createElement('div');
+            bar.className = 'progress task-progress';
+            bar.innerHTML = `<div class="progress-bar ${t.done ? 'bg-success' : 'progress-bar-striped progress-bar-animated'}" role="progressbar" style="width: ${t.percent}%"></div>`;
+            li.append(head, bar);
+            list.append(li);
+        });
+        nowEmpty();
+    }
+
+    loadTransfers();
+    setInterval(() => { if (!document.hidden) loadTransfers(); }, 2000);
+</script>
 <script>
     // Overview > Downloads: a tile with the total that opens the history, with covers
     const DL_TEXT = {
@@ -768,9 +840,9 @@
     }
 
     function taskMeta(task) {
-        if (task.cancelled) return 'cancelled';
-        if (isFinished(task)) return 'finished';
-        if (task.status === 'failed') return task.errorMessage || 'failed';
+        if (task.cancelled) return 'Cancelled';
+        if (isFinished(task)) return 'Finished';
+        if (task.status === 'failed') return task.errorMessage || 'Failed';
         if (task.runAfter) return scheduledWhen(task.runAfter);
         if (!task.startedAt) return '';
 
@@ -971,6 +1043,7 @@
         // minutes: "Now" is for work being done, not a countdown to something already set.
         section('queueTasks', 'queueEmpty', roots.filter(
             t => t.status !== 'failed' && (!t.runAfter || new Date(t.runAfter).getTime() - clockNow() <= SCHEDULED_SHOWN_MS)));
+        nowEmpty();
         const failed = roots.filter(t => t.status === 'failed');
         section('failedTasks', 'failedEmpty', failed);
         document.getElementById('purgeFailed').classList.toggle('d-none', !failed.length);

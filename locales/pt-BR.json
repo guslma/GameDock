@@ -882,5 +882,9 @@
  "A user's login was used on a console it had not been used on before (Tinfoil and CyberFoil).": "O login de um usuário foi usado num console em que nunca tinha sido usado antes (Tinfoil e CyberFoil).",
  "Shared logins:": "Contas compartilhadas:",
  "Tinfoil and CyberFoil send an id of the console. Sphaira does not, so it shows as one unidentified entry and is not counted as another console.": "O Tinfoil e o CyberFoil mandam um identificador do console. O Sphaira não manda, então aparece como um console sem identificação e não conta como outro console.",
- "Unidentified console": "Console sem identificação"
+ "Unidentified console": "Console sem identificação",
+ "Finished": "Concluído",
+ "Paused": "Parado",
+ "Time left:": "Faltam:",
+ "Cancelled": "Cancelada"
 }

@@ -288,12 +288,18 @@ def init_users(app):
         if os.environ.get('USER_GUEST_NAME') is not None:
             init_user_from_environment(environment_name="USER_GUEST", admin=False)
 
+def home_after_login(user, next_url):
+    """GameDock: an admin who did not ask for a page lands on the Overview, everyone else on the library."""
+    if next_url and next_url != '/':
+        return next_url
+    return '/admin' if user.admin_access else '/'
+
 @auth_blueprint.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         next_url = request.args.get('next', '')
         if current_user.is_authenticated:
-            return redirect(next_url if len(next_url) else '/')
+            return redirect(home_after_login(current_user, next_url))
         return render_template('login.html', title='Login')
         
     # login code goes here
@@ -314,7 +320,7 @@ def login():
     logger.info(f'Sucessfull login for user {username}')
     login_user(user, remember=remember)
 
-    return redirect(next_url if len(next_url) else '/')
+    return redirect(home_after_login(user, next_url))
 
 @auth_blueprint.route('/profile')
 @login_required

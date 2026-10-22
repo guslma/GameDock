@@ -198,6 +198,111 @@ def record(request, filepath):
         logger.exception("Could not record a download in the history")
 
 
+# --- downloads in progress ---------------------------------------------------------------------
+# Kept in memory: the web process serves every file (one Gunicorn worker), and the Overview
+# asks for them every few seconds. A console that takes a file in several Range requests
+# shows as one transfer: progress is how far into the file the latest piece reached.
+
+TRANSFER_IDLE = 20     # seconds without a byte before a transfer leaves "Now"
+TRANSFER_DONE_SHOWN = 8
+_transfers = {}
+_transfers_lock = threading.Lock()
+
+
+class _Counting:
+    """Wraps the body of a file response to count what actually went out."""
+
+    def __init__(self, body, transfer, start):
+        self.body = body
+        self.transfer = transfer
+        self.position = start
+
+    def __iter__(self):
+        pending = 0
+        for chunk in self.body:
+            self.position += len(chunk)
+            pending += len(chunk)
+            if pending >= 1 << 20:  # the shared numbers move once a megabyte, not per 8 KB piece
+                self._flush(pending)
+                pending = 0
+            yield chunk
+        self._flush(pending)
+
+    def _flush(self, sent):
+        with _transfers_lock:
+            t = self.transfer
+            t["sent"] += sent
+            t["reached"] = max(t["reached"], self.position)
+            t["last"] = time.monotonic()
+
+    def close(self):
+        with _transfers_lock:
+            self.transfer["open"] -= 1
+            self.transfer["reached"] = max(self.transfer["reached"], self.position)
+            self.transfer["last"] = time.monotonic()
+        if hasattr(self.body, "close"):
+            self.body.close()
+
+
+def track(request, filepath, response):
+    """Follow a file response while it streams, for "Now" in the Overview."""
+    try:
+        if request.method != "GET" or response.status_code not in (200, 206):
+            return response
+        total = os.path.getsize(filepath)
+        start = 0
+        content_range = response.headers.get("Content-Range", "")
+        if content_range.startswith("bytes ") and "-" in content_range:
+            start = int(content_range[6:].split("-")[0])
+        from utils import client_address
+        user = _who(request)
+        key = (user or client_address(request), filepath)
+        now = time.monotonic()
+        with _transfers_lock:
+            transfer = _transfers.get(key)
+            if transfer is None or transfer["done"]:
+                info = _describe(filepath)
+                transfer = _transfers[key] = {
+                    "user": user, "client": _client(request), "console": short_console(_console(request)),
+                    "title_id": info["title_id"], "title_name": info["title_name"] or info["filename"],
+                    "app_type": info["app_type"], "app_name": info["app_name"], "version": info["version"],
+                    "size": total, "sent": 0, "reached": start, "began": now, "last": now,
+                    "open": 0, "done": False}
+            transfer["open"] += 1
+            transfer["last"] = now
+        response.response = _Counting(response.response, transfer, start)
+        response.direct_passthrough = False
+    except Exception:
+        logger.exception("Could not follow a download")
+    return response
+
+
+def transfers():
+    """Downloads streaming now, or that stopped a moment ago."""
+    now = time.monotonic()
+    shown = []
+    with _transfers_lock:
+        for key, t in list(_transfers.items()):
+            if t["reached"] >= t["size"]:
+                t["done"] = True
+            idle = now - t["last"]
+            if (t["done"] and idle > TRANSFER_DONE_SHOWN) or (t["open"] <= 0 and idle > TRANSFER_IDLE):
+                del _transfers[key]
+                continue
+            elapsed = max(t["last"] - t["began"], 0.001)
+            speed = t["sent"] / elapsed
+            left = t["size"] - t["reached"]
+            shown.append({
+                "user": t["user"], "client": t["client"], "console": t["console"], "title_id": t["title_id"],
+                "title_name": t["title_name"], "app_type": t["app_type"], "app_name": t["app_name"],
+                "version": t["version"], "size": t["size"], "reached": t["reached"],
+                "percent": round(100 * t["reached"] / t["size"], 1) if t["size"] else 100,
+                "speed": round(speed), "eta": round(left / speed) if speed > 0 and not t["done"] else None,
+                "done": t["done"], "stalled": t["open"] <= 0 and not t["done"],
+            })
+    return sorted(shown, key=lambda t: t["percent"])
+
+
 def history(user=None, search="", limit=500):
     """The newest downloads, optionally for one user ("" for downloads without a user)."""
     query = "SELECT at, user, client, ip, filename, title_id, title_name, app_type, app_name, version, size, console FROM downloads"
@@ -242,6 +347,12 @@ def install(app):
     from flask import jsonify, request
     from flask_login import login_required
     from auth import access_required
+
+    @app.route("/api/gamedock/transfers")
+    @login_required
+    @access_required("admin")
+    def gamedock_transfers():
+        return jsonify({"transfers": transfers()})
 
     @app.route("/api/gamedock/downloads", methods=["GET", "DELETE"])
     @login_required
