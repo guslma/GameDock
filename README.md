@@ -41,7 +41,7 @@ sudo docker run -d --name gamedock \
   ghcr.io/guslma/gamedock:latest
 ```
 
-Depois, abra `http://IP-DA-MÁQUINA:8465` no navegador. A imagem funciona em computadores comuns (amd64) e em ARM (arm64 e armv7).
+Depois, abra `http://IP-DA-MÁQUINA:8465` no navegador. A imagem funciona em computadores comuns (amd64) e em ARM de 64 bits (arm64, como Raspberry Pi 4 e 5 com sistema de 64 bits).
 
 - `TZ` é o fuso horário, usado nos registros (**Admin → Configurações → Logs**) e nos agendamentos. Sem ele, o GameDock usa UTC. Em vez de escrever o fuso, dá para usar o da própria máquina com `-v /etc/localtime:/etc/localtime:ro`.
 - O usuário de `USER_ADMIN_NAME` e `USER_ADMIN_PASSWORD` é recriado a cada início do contêiner. Para mudar a senha dele, mude a variável. Os outros usuários são criados e editados em **Admin → Configurações → Usuários**.
