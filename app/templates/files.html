@@ -324,6 +324,8 @@
                   gql: v => ({libraryId: {in: v.map(Number)}}), match: (r, v) => v.includes(String(r.libraryId))},
     };
 
+    // Pipeline stages as the server names them, in words
+    const STAGE_NAMES = {read: 'Read the file', organize: 'Organize', verify: 'Verify', compress: 'Compress'};
     const TABS = {
         all: {kind: 'files', base: {}},
         unidentified: {kind: 'files', base: {identified: false},
@@ -333,7 +335,7 @@
                            || (r.verificationStatus === 'UNVERIFIED' ? 'Not verified yet' : humanize(r.verificationStatus))},
         duplicates: {kind: 'groups', field: 'duplicates', mutation: 'removeDuplicates'},
         outdated: {kind: 'groups', field: 'outdatedUpdates', mutation: 'removeOutdatedUpdates'},
-        pending: {kind: 'pending', detail: r => r._stages.join(' · ')},
+        pending: {kind: 'pending', detail: r => r._stages.map(stage => STAGE_NAMES[stage] || stage).join(' · ')},
     };
     Object.values(TABS).forEach(t => Object.assign(t, {
         filters: {}, chips: [], search: '', page: 1, rows: null, skipped: new Set(),

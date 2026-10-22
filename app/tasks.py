@@ -840,7 +840,13 @@ def _needs_verify(file, mgmt):
 
 
 def _needs_organize(file, mgmt):
-    return mgmt['organizer']['enabled'] and file.identified and not file.organized
+    if not (mgmt['organizer']['enabled'] and file.identified and not file.organized):
+        return False
+    # GameDock: a file the templates cannot place (a game the catalogue does not know yet,
+    # or one with no content linked) is not work left to do. Counting it kept it under
+    # "Processing due" forever; it is organized once the catalogue learns its name.
+    from library import organized_path
+    return organized_path(file, get_library_path(file.library_id), mgmt['organizer'], quiet=True) is not None
 
 
 def _organize(file, mgmt):

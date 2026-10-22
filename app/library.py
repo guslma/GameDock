@@ -22,14 +22,16 @@ def prepare_template_names(format_data, windows_compatible):
 
     return {**format_data, **names}
 
-def organized_path(file_obj, library_path, organizer_settings):
-    """Where the organizer templates place a file, None when it cannot be organized."""
+def organized_path(file_obj, library_path, organizer_settings, quiet=False):
+    """Where the organizer templates place a file, None when it cannot be organized.
+    `quiet` skips the warnings, for callers that only ask whether a move is possible."""
     templates = organizer_settings['templates']
 
     # Get the associated app for the file
     app = file_obj.apps[0] if file_obj.apps else None
     if not app:
-        logger.warning(f"No app associated with file {file_obj.filename}. Skipping organization.")
+        if not quiet:
+            logger.warning(f"No app associated with file {file_obj.filename}. Skipping organization.")
         return None
 
     template = _get_template_for_file(file_obj, app, templates)
@@ -39,7 +41,8 @@ def organized_path(file_obj, library_path, organizer_settings):
     # Get title name from the associated title_id
     title_info = titles_lib.get_game_info(app.title.title_id)
     if title_info['name'] == 'Unrecognized':
-        logger.warning(f"No title info associated with file {file_obj.filename}. Skipping organization.")
+        if not quiet:
+            logger.warning(f"No title info associated with file {file_obj.filename}. Skipping organization.")
         return None
     format_data["extension"] = file_obj.extension
     format_data["titleId"] = app.title.title_id
