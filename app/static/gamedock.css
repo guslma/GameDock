@@ -287,6 +287,30 @@ code { color: #C9C0FF; }
 .gd-log-error, .gd-log-critical { color: #F28B8B; }
 .gd-log-empty { color: var(--gd-muted); font-family: var(--bs-body-font-family); }
 
+/* ---- Settings: download history ---- */
+.gd-dl-users { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.gd-dl-user {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    background: var(--gd-surface-2); border: 1px solid var(--gd-border); border-radius: 10px;
+    padding: 8px 12px; color: var(--gd-text); text-align: left;
+}
+.gd-dl-user span { color: var(--gd-muted); font-size: .78rem; }
+.gd-dl-user:hover { border-color: var(--gd-border-strong); }
+.gd-dl-user.active { background: rgba(91, 71, 240, .16); border-color: rgba(123, 92, 255, .45); }
+#statTiles > .gd-tile-button {
+    background: var(--gd-surface); border: 1px solid var(--gd-border); border-radius: 14px; padding: 16px;
+    display: flex; flex-direction: column; align-items: stretch; color: inherit; font: inherit; text-align: left;
+    cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
+}
+#statTiles > .gd-tile-button:hover { border-color: rgba(123, 92, 255, .55); background: #1D1F2A; }
+#statTiles > .gd-tile-button .stat-label .bi { font-size: .7rem; margin-left: 4px; }
+.gd-dl-list { display: flex; flex-direction: column; }
+.gd-dl-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--gd-border); }
+.gd-dl-row:first-child { border-top: 0; }
+.gd-dl-text { min-width: 0; flex: 1; }
+.gd-dl-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; white-space: nowrap; font-size: .85rem; }
+.gd-dl-side span { color: var(--gd-muted); font-size: .78rem; }
+
 /* Card titles: the same size wherever they sit, with room below them */
 .gd-card h2 { font-size: 1.05rem; font-weight: 600; }
 .gd-card > h2 + .row, .gd-card > h2 + .stat-sections { margin-top: 10px; }

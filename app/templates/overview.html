@@ -30,6 +30,30 @@
 
     <div id="statTiles" class="gd-tiles"></div>
 
+    <div class="modal fade" id="downloadModal" tabindex="-1" aria-labelledby="downloadModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="downloadModalTitle">Downloads</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                        <label class="gd-search me-auto" style="height: 34px; width: 240px">
+                            <i class="bi bi-search" aria-hidden="true"></i>
+                            <span class="visually-hidden">Search downloads</span>
+                            <input type="text" id="downloadSearch" placeholder="Search game">
+                        </label>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="downloadClear"><i class="bi bi-trash" aria-hidden="true"></i> Clear history</button>
+                    </div>
+                    <div id="downloadUsers" class="gd-dl-users"></div>
+                    <div id="downloadRows" class="gd-dl-list"></div>
+                    <p id="downloadEmpty" class="text-secondary mb-0 d-none"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <section class="gd-card">
         <h2 class="h5 mb-3">Now</h2>
         <div class="task-scroll">
@@ -106,6 +130,164 @@
 {% endblock %}
 
 {% block panel_scripts %}
+<script>
+    // Overview > Downloads: a tile with the total that opens the history, with covers
+    const DL_TEXT = {
+        title: 'Downloads', all: 'Everyone', noUser: 'No user', count: 'Downloads:', last: 'Last:',
+        game: 'Game', update: 'Update', dlc: 'DLC', browser: 'Browser',
+        noneYet: 'None recorded yet', open: 'Click to see who downloaded what',
+        empty: 'No downloads recorded yet. They show up here from now on.',
+        noMatch: 'No download matches the search.',
+        confirmClear: 'Clear the whole download history?',
+    };
+    let dlUser = '*';
+    let dlSummary = null;
+
+    function dlSize(bytes) {
+        if (!bytes) return '—';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+        return `${bytes.toFixed(i > 2 ? 1 : 0)} ${units[i]}`;
+    }
+
+    function dlDate(iso) {
+        return new Date(iso).toLocaleString([], {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+    }
+
+    function dlWhat(row) {
+        if (row.app_type === 'UPDATE') return row.version ? `${DL_TEXT.update} ${row.version}` : DL_TEXT.update;
+        if (row.app_type === 'DLC') return row.app_name ? `${DL_TEXT.dlc}: ${row.app_name}` : DL_TEXT.dlc;
+        if (row.app_type === 'BASE') return DL_TEXT.game;
+        return '';
+    }
+
+    // The tile is rebuilt with the others on every stats refresh, so it is drawn from here
+    function downloadTile() {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'gd-tile-button';
+        tile.title = DL_TEXT.open;
+        tile.setAttribute('data-bs-toggle', 'modal');
+        tile.setAttribute('data-bs-target', '#downloadModal');
+        const value = document.createElement('div');
+        value.className = 'stat-value';
+        const label = document.createElement('div');
+        label.className = 'stat-label';
+        label.innerHTML = `${DL_TEXT.title} <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>`;
+        const note = document.createElement('div');
+        note.className = 'stat-note';
+        if (dlSummary) {
+            const total = dlSummary.reduce((sum, u) => sum + u.count, 0);
+            const last = dlSummary.reduce((max, u) => (u.last > max ? u.last : max), '');
+            value.textContent = total;
+            const short = last ? new Date(last).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '';
+            note.textContent = total ? `${DL_TEXT.last} ${short}` : DL_TEXT.noneYet;
+        } else {
+            value.textContent = '—';
+        }
+        tile.append(value, label, note);
+        return tile;
+    }
+
+    function refreshDownloadTile() {
+        const old = document.querySelector('#statTiles .gd-tile-button');
+        if (old) old.replaceWith(downloadTile());
+    }
+
+    async function loadDownloads() {
+        const params = new URLSearchParams({user: dlUser, search: document.getElementById('downloadSearch').value.trim()});
+        let data;
+        try {
+            data = await (await fetch('/api/gamedock/downloads?' + params, {credentials: 'same-origin'})).json();
+        } catch (e) {
+            return;
+        }
+        dlSummary = data.users;
+        refreshDownloadTile();
+
+        const cards = document.getElementById('downloadUsers');
+        cards.innerHTML = '';
+        const total = data.users.reduce((sum, u) => sum + u.count, 0);
+        [{user: '*', count: total}, ...data.users].forEach(u => {
+            const key = u.user === '*' ? '*' : (u.user || '');
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'gd-dl-user' + (key === dlUser ? ' active' : '');
+            const name = document.createElement('strong');
+            name.textContent = u.user === '*' ? DL_TEXT.all : (u.user || DL_TEXT.noUser);
+            const meta = document.createElement('span');
+            meta.textContent = `${DL_TEXT.count} ${u.count}` + (u.last ? ` · ${dlSize(u.size)} · ${DL_TEXT.last} ${dlDate(u.last)}` : '');
+            card.append(name, meta);
+            card.addEventListener('click', () => { dlUser = key; loadDownloads(); });
+            cards.append(card);
+        });
+        cards.classList.toggle('d-none', !data.users.length);
+
+        const list = document.getElementById('downloadRows');
+        list.innerHTML = '';
+        data.downloads.forEach(row => {
+            const item = document.createElement('div');
+            item.className = 'gd-dl-row';
+            const cover = document.createElement('img');
+            cover.className = 'gd-missing-icon';
+            cover.alt = '';
+            if (row.title_id) cover.dataset.dlTitle = row.title_id;
+            const text = document.createElement('div');
+            text.className = 'gd-dl-text';
+            const name = document.createElement('div');
+            name.className = 'gd-missing-name';
+            name.textContent = row.title_name || row.filename;
+            name.title = row.filename;
+            const line = document.createElement('div');
+            line.className = 'gd-missing-line';
+            line.textContent = [dlWhat(row), row.client === 'Browser' ? DL_TEXT.browser : row.client, dlSize(row.size)].filter(Boolean).join(' · ');
+            text.append(name, line);
+            const side = document.createElement('div');
+            side.className = 'gd-dl-side';
+            const who = document.createElement('strong');
+            who.textContent = row.user || DL_TEXT.noUser;
+            const when = document.createElement('span');
+            when.textContent = dlDate(row.at);
+            side.append(who, when);
+            item.append(cover, text, side);
+            list.append(item);
+        });
+        const empty = document.getElementById('downloadEmpty');
+        empty.textContent = total ? DL_TEXT.noMatch : DL_TEXT.empty;
+        empty.classList.toggle('d-none', data.downloads.length > 0);
+        loadDownloadCovers([...new Set(data.downloads.map(r => r.title_id).filter(Boolean))]);
+    }
+
+    // Covers in one GraphQL call, one alias per game, as in "What is missing"
+    async function loadDownloadCovers(ids) {
+        if (!ids.length) return;
+        const fields = ids.map((id, i) => `t${i}: title(titleId: "${id}") { icon(size: THUMB) { url } }`).join(' ');
+        try {
+            const body = await (await fetch('/api/graphql?' + new URLSearchParams({query: `query { ${fields} }`}),
+                {credentials: 'same-origin'})).json();
+            ids.forEach((id, i) => {
+                const url = (((body.data || {})[`t${i}`] || {}).icon || {}).url;
+                if (url) document.querySelectorAll(`#downloadRows img[data-dl-title="${id}"]`).forEach(img => { img.src = url; });
+            });
+        } catch (e) { /* covers are optional */ }
+    }
+
+    document.getElementById('downloadModal').addEventListener('show.bs.modal', loadDownloads);
+    let dlSearchDelay;
+    document.getElementById('downloadSearch').addEventListener('input', () => {
+        clearTimeout(dlSearchDelay);
+        dlSearchDelay = setTimeout(loadDownloads, 300);
+    });
+    document.getElementById('downloadClear').addEventListener('click', async () => {
+        if (!confirm(DL_TEXT.confirmClear)) return;
+        await fetch('/api/gamedock/downloads', {method: 'DELETE', credentials: 'same-origin'});
+        dlUser = '*';
+        loadDownloads();
+    });
+    loadDownloads();
+    setInterval(() => { if (!document.hidden) loadDownloads(); }, 60000);
+</script>
 <script>
     // What is missing: newest update and DLC not in the library, per game
     const MISSING_SHOWN = 8;
@@ -286,6 +468,7 @@
                 <div class="stat-note">${note}</div>`;
             container.appendChild(tile);
         });
+        container.appendChild(downloadTile());
     }
 
     /** Fill a table body with rows of cells: first column left, the figures right. */
@@ -528,6 +711,7 @@
         update_titledb: 'Update the game catalogue',
         scan_libraries: 'Look for new files in the library',
         process_library: 'Process library files',
+        library_maintenance: 'Tidy up the library',
         download_media: 'Download covers',
         update_titles: 'Update game information',
         add_missing_apps: 'Look for missing content',

@@ -191,6 +191,8 @@ gamedock_users.install(app)
 gamedock_system.install(app)
 import gamedock_notify
 gamedock_notify.install(app)
+import gamedock_downloads
+gamedock_downloads.install(app)
 
 # Realtime WebSocket. ping_interval keeps idle sockets alive through proxies and lets
 # the server notice a peer that went away without closing.
@@ -741,4 +743,6 @@ def download_file(token):
     filepath = db.session.query(Files.filepath).filter_by(download_token=token).scalar()
     if not filepath:
         return jsonify({'error': 'No file with that token.'}), 404
-    return send_library_file(filepath)
+    response = send_library_file(filepath)
+    gamedock_downloads.record(request, filepath)
+    return response
