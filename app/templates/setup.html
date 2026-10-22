@@ -110,12 +110,14 @@
                     </table>
                     {% endif %}
                     {% if remote_host %}
-                    <div class="form-text mt-2">Away from home, a second entry:</div>
+                    {% if local_address %}<div class="form-text mt-2">Away from home, a second entry:</div>{% endif %}
                     <table class="gd-kv">
                         <tr><td>Protocol</td><td><code>https</code></td></tr>
                         <tr><td>Host</td><td><code>{{ remote_host }}</code></td></tr>
                         <tr><td>Path</td><td><code>/</code></td></tr>
-                        <tr><td>Title</td><td><code>{{ shop_name }} - Remote</code></td></tr>
+                        {% if not local_address and admin_account_created and not shop_public %}<tr><td>Username</td><td><code>{{ username }}</code></td></tr><tr><td>Password</td><td>your password</td></tr>{% endif %}
+                        <tr><td>Title</td><td><code>{{ shop_name }}{% if local_address %} - Remote{% endif %}</code></td></tr>
+                        {% if not local_address %}<tr><td>Enabled</td><td><code>YES</code></td></tr>{% endif %}
                     </table>
                     {% endif %}
                 </li>
@@ -141,8 +143,16 @@
                         {% if admin_account_created and not shop_public %}<tr><td>Username</td><td><code>{{ username }}</code></td></tr><tr><td>Password</td><td>your password</td></tr>{% endif %}
                     </table>
                     {% endif %}
-                    {% if remote_host %}
+                    {% if remote_host and local_address %}
                     <div class="form-text mt-2">Away from home: protocol <code>HTTPS</code>, host <code>{{ remote_host }}</code>, port <code>443</code>.</div>
+                    {% elif remote_host %}
+                    <table class="gd-kv">
+                        <tr><td>Shop title</td><td><code>{{ shop_name }}</code></td></tr>
+                        <tr><td>Shop protocol</td><td><code>HTTPS</code></td></tr>
+                        <tr><td>Host</td><td><code>{{ remote_host }}</code></td></tr>
+                        <tr><td>Port</td><td><code>443</code></td></tr>
+                        {% if admin_account_created and not shop_public %}<tr><td>Username</td><td><code>{{ username }}</code></td></tr><tr><td>Password</td><td>your password</td></tr>{% endif %}
+                    </table>
                     {% endif %}
                 </li>
                 <li>Make sure <strong>Active shop</strong> is the new shop.</li>

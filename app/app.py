@@ -437,9 +437,13 @@ def setup_page():
     # Get remote host from configuration
     remote_host = settings['shop'].get('host', '')
 
+    is_admin = not admin_account_created() or (current_user.is_authenticated and current_user.has_admin_access())
+
     # Check if we're accessing via the configured remote host
-    # If so, hide the local tab since we're already remote
-    show_local_tab = not remote_host or remote_host != request.host
+    # If so, hide the local tab since we're already remote.
+    # GameDock: the home address is only for admins; the other users are friends who
+    # connect from their own homes, so they only get the remote address
+    show_local_tab = is_admin and (not remote_host or remote_host != request.host)
     if show_local_tab:
         # The Host header is the browser's view of the server (localhost, an mDNS name, a
         # container name) and is often unreachable from the Switch, so prefer our own LAN IP.
@@ -458,7 +462,6 @@ def setup_page():
 
     # Check if shop is public
     shop_public = settings['shop']['public']
-    is_admin = not admin_account_created() or (current_user.is_authenticated and current_user.has_admin_access())
 
     return render_template(
         'setup.html',
