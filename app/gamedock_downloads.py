@@ -5,8 +5,9 @@ Ownfoil only keeps a running count per file. GameDock records each download in i
 SQLite file next to the main database (config/downloads.db), so the Ownfoil schema and its
 migrations stay untouched and the history is part of every config backup.
 
-Consoles fetch a file in several Range requests, so one user taking the same file again
-within DEDUP_WINDOW counts as the same download.
+Only finished downloads are kept: a console fetches a file in several Range requests,
+often in parallel, and the entry is written once the bytes sent cover the whole file and
+the last of those requests closed.
 
 Tinfoil and CyberFoil send the console's own id (the Uid header) with every request. Each
 (login, console) pair is kept with when it was first and last seen, which shows one login
@@ -27,7 +28,6 @@ from constants import CONFIG_DIR, APP_TYPE_BASE, APP_TYPE_UPD, APP_TYPE_DLC
 logger = logging.getLogger("main")
 
 DB_FILE = os.path.join(CONFIG_DIR, "downloads.db")
-DEDUP_WINDOW = datetime.timedelta(minutes=30)
 KEEP_ROWS = 10000
 SEEN_EVERY = 60  # seconds between "last seen" writes for the same login and console
 _lock = threading.Lock()
@@ -167,33 +167,28 @@ def _describe(filepath):
 
 
 def record(request, filepath):
-    """Store one download. Never lets a history problem get in the way of the file itself."""
+    """Note the console behind a file request. The history entry itself is written by
+    track() once the whole file went out, so a download given up halfway leaves none."""
     if request.method != "GET":
         return
+    seen(request)
+
+
+def _save_download(t):
+    """One finished download into the history."""
     try:
-        seen(request)
-        user = _who(request)
-        console = _console(request)
-        from utils import client_address
-        ip = client_address(request)
-        now = datetime.datetime.now(datetime.timezone.utc)
-        since = (now - DEDUP_WINDOW).isoformat()
-        info = _describe(filepath)
+        info = t["info"]
         with _lock, _connect() as connection:
-            repeated = connection.execute(
-                "SELECT 1 FROM downloads WHERE filename = ? AND IFNULL(user, '') = ? AND IFNULL(ip, '') = ? AND at >= ?",
-                (info["filename"], user or "", ip or "", since)).fetchone()
-            if repeated:
-                return
             connection.execute(
                 "INSERT INTO downloads (at, user, client, ip, file_id, filename, title_id, title_name, app_type, app_name, version, size, console) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (now.isoformat(), user, _client(request), ip, info["file_id"], info["filename"], info["title_id"],
-                 info["title_name"], info["app_type"], info["app_name"], info["version"], info["size"], console))
+                (datetime.datetime.now(datetime.timezone.utc).isoformat(), t["user"], t["client"], t["ip"], info["file_id"],
+                 info["filename"], info["title_id"], info["title_name"], info["app_type"], info["app_name"], info["version"],
+                 info["size"], t["console_id"]))
             connection.execute(
                 "DELETE FROM downloads WHERE id <= (SELECT id FROM downloads ORDER BY id DESC LIMIT 1 OFFSET ?)",
                 (KEEP_ROWS,))
-        logger.info(f"Download: {info['filename']} by {user or 'no user'} ({_client(request) or 'unknown app'})")
+        logger.info(f"Download: {info['filename']} by {t['user'] or 'no user'} ({t['client'] or 'unknown app'})")
     except Exception:
         logger.exception("Could not record a download in the history")
 
@@ -240,9 +235,16 @@ class _Counting:
 
     def close(self):
         with _transfers_lock:
-            self.transfer["open"] -= 1
-            self.transfer["reached"] = max(self.transfer["reached"], self.position)
-            self.transfer["last"] = time.monotonic()
+            t = self.transfer
+            t["open"] -= 1
+            t["reached"] = max(t["reached"], self.position)
+            t["last"] = time.monotonic()
+            # The last piece of a whole file just closed: that is a finished download
+            finished = t["open"] <= 0 and t["sent"] >= t["size"] and not t["recorded"]
+            if finished:
+                t["recorded"] = True
+        if finished:
+            _save_download(t)
         if hasattr(self.body, "close"):
             self.body.close()
 
@@ -267,6 +269,7 @@ def track(request, filepath, response):
                 info = _describe(filepath)
                 transfer = _transfers[key] = {
                     "user": user, "client": _client(request), "console": short_console(_console(request)),
+                    "console_id": _console(request), "ip": client_address(request), "info": info, "recorded": False,
                     "title_id": info["title_id"], "title_name": info["title_name"] or info["filename"],
                     "app_type": info["app_type"], "app_name": info["app_name"], "version": info["version"],
                     "size": total, "sent": 0, "reached": start, "began": now, "last": now,
