@@ -201,7 +201,10 @@ def record(request, filepath):
 # --- downloads in progress ---------------------------------------------------------------------
 # Kept in memory: the web process serves every file (one Gunicorn worker), and the Overview
 # asks for them every few seconds. A console that takes a file in several Range requests
-# shows as one transfer: progress is how far into the file the latest piece reached.
+# shows as one transfer. Progress is the bytes actually sent across all of them: Sphaira
+# fetches several pieces of a file at once, so how far into the file one piece reached
+# says nothing about the pieces still in flight. It is done when the sent bytes cover the
+# file and no piece is still streaming.
 
 TRANSFER_IDLE = 20     # seconds without a byte before a transfer leaves "Now"
 TRANSFER_DONE_SHOWN = 8
@@ -283,7 +286,7 @@ def transfers():
     shown = []
     with _transfers_lock:
         for key, t in list(_transfers.items()):
-            if t["reached"] >= t["size"]:
+            if t["sent"] >= t["size"] and t["open"] <= 0:
                 t["done"] = True
             idle = now - t["last"]
             if (t["done"] and idle > TRANSFER_DONE_SHOWN) or (t["open"] <= 0 and idle > TRANSFER_IDLE):
@@ -291,12 +294,13 @@ def transfers():
                 continue
             elapsed = max(t["last"] - t["began"], 0.001)
             speed = t["sent"] / elapsed
-            left = t["size"] - t["reached"]
+            delivered = min(t["sent"], t["size"])
+            left = t["size"] - delivered
             shown.append({
                 "user": t["user"], "client": t["client"], "console": t["console"], "title_id": t["title_id"],
                 "title_name": t["title_name"], "app_type": t["app_type"], "app_name": t["app_name"],
-                "version": t["version"], "size": t["size"], "reached": t["reached"],
-                "percent": round(100 * t["reached"] / t["size"], 1) if t["size"] else 100,
+                "version": t["version"], "size": t["size"], "reached": delivered,
+                "percent": round(100 * delivered / t["size"], 1) if t["size"] else 100,
                 "speed": round(speed), "eta": round(left / speed) if speed > 0 and not t["done"] else None,
                 "done": t["done"], "stalled": t["open"] <= 0 and not t["done"],
             })
