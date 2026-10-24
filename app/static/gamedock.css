@@ -317,6 +317,16 @@ code { color: #C9C0FF; }
 .gd-dl-text { min-width: 0; flex: 1; }
 .gd-dl-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; white-space: nowrap; font-size: .85rem; }
 .gd-dl-side span { color: var(--gd-muted); font-size: .78rem; }
+.gd-dl-game { border-top: 1px solid var(--gd-border); }
+.gd-dl-game:first-child { border-top: 0; }
+.gd-dl-head { width: 100%; border: 0 !important; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 10px; }
+.gd-dl-head:hover { background: var(--gd-surface-2); }
+.gd-dl-chevron { color: var(--gd-muted); padding: 0 4px; transition: transform .15s ease; }
+.gd-dl-game.open .gd-dl-chevron { transform: rotate(180deg); }
+.gd-dl-items { display: none; margin: 0 0 10px 60px; border-left: 2px solid var(--gd-border); }
+.gd-dl-game.open .gd-dl-items { display: block; }
+.gd-dl-item { display: flex; align-items: center; gap: 12px; padding: 7px 0 7px 14px; }
+.gd-dl-what { font-weight: 500; }
 
 /* Card titles: the same size wherever they sit, with room below them */
 .gd-card h2 { font-size: 1.05rem; font-weight: 600; }
@@ -333,3 +343,16 @@ code { color: #C9C0FF; }
 .gd-missing-text { min-width: 0; }
 .gd-missing-name { font-weight: 600; margin-bottom: 4px; }
 .gd-missing-line { font-size: .85rem; color: #C9CED6; margin-top: 2px; }
+
+/* ---- Library: covers per row follow the screen as well as the size slider ---- */
+#gameGrid .game-icon-link { width: calc(100% / var(--icons-per-row, 6)); padding: 5px; margin-top: 0; }
+/* The grid's row gutter is sized for the big cards: covers take an even 5px all round */
+#gameGrid:has(> .game-icon-link) { margin-top: 0; margin-left: -5px; margin-right: -5px; }
+#gameGrid .game-icon-link .game-icon { border-radius: 10px; }
+@media (max-width: 575.98px) {
+    #gameGrid .game-icon-link { width: calc(100% / min(var(--icons-per-row, 6), 3)); }
+}
+@media (min-width: 576px) and (max-width: 991.98px) {
+    #gameGrid .game-icon-link { width: calc(100% / min(var(--icons-per-row, 6), 5)); }
+}
+

@@ -886,5 +886,10 @@
  "Finished": "Concluído",
  "Paused": "Parado",
  "Time left:": "Faltam:",
- "Cancelled": "Cancelada"
+ "Cancelled": "Cancelada",
+ "Updates:": "Atualizações:",
+ "DLC:": "DLC:",
+ "Users:": "Usuários:",
+ "Show what was downloaded": "Mostrar o que foi baixado",
+ "Hide what was downloaded": "Esconder o que foi baixado"
 }

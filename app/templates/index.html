@@ -618,12 +618,10 @@
     }
 
     function adjustIconSizes() {
-        // Calculate the size of the icons based on the slider value
-        const iconSize = 100 / (cardSize + 3); // Assuming 100 is the maximum size
-
-        // Update the CSS of the game icons - the link is what carries the width now,
-        // since the icon fills it.
-        $('.game-icon-link').css('width', `${iconSize}%`);
+        // GameDock: the slider sets how many covers a row holds on a wide screen (4 to 8);
+        // the stylesheet caps that on narrow ones, so a phone never gets 8 tiny covers.
+        document.getElementById('gameGrid').style.setProperty('--icons-per-row', cardSize + 3);
+        $('.game-icon-link').css('width', '');
     }
 
     function saveFiltersToStorage() {

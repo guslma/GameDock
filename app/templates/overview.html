@@ -213,11 +213,14 @@
         consolesOf: 'Consoles that used this login', firstSeen: 'First:', accesses: 'Accesses:',
         consolesHelp: 'Tinfoil and CyberFoil send an id of the console. Sphaira does not, so it shows as one unidentified entry and is not counted as another console.',
         unidentified: 'Unidentified console',
+        updates: 'Updates:', dlcs: 'DLC:', users: 'Users:',
+        expand: 'Show what was downloaded', collapse: 'Hide what was downloaded',
         empty: 'No downloads recorded yet. They show up here from now on.',
         noMatch: 'No download matches the search.',
         confirmClear: 'Clear the whole download history?',
     };
     let dlUser = '*';
+    const dlOpen = new Set();
     let dlSummary = null;
 
     function dlSize(bytes) {
@@ -336,35 +339,92 @@
         }
         box.classList.toggle('d-none', !box.childElementCount);
 
+        // One compact line per game; the game itself, its updates and DLC open under a chevron
         const list = document.getElementById('downloadRows');
         list.innerHTML = '';
+        const games = new Map();
         data.downloads.forEach(row => {
-            const item = document.createElement('div');
-            item.className = 'gd-dl-row';
+            const key = row.title_id || row.filename;
+            if (!games.has(key)) games.set(key, {key, title_id: row.title_id, name: row.title_name || row.filename, rows: []});
+            games.get(key).rows.push(row);
+        });
+        games.forEach(game => {
+            const rows = game.rows;
+            const base = rows.filter(r => r.app_type === 'BASE').length;
+            const updates = rows.filter(r => r.app_type === 'UPDATE').length;
+            const dlcs = rows.filter(r => r.app_type === 'DLC').length;
+            const users = [...new Set(rows.map(r => r.user || DL_TEXT.noUser))];
+            const size = rows.reduce((sum, r) => sum + (r.size || 0), 0);
+            const open = dlOpen.has(game.key);
+
+            const box = document.createElement('div');
+            box.className = 'gd-dl-game' + (open ? ' open' : '');
+            const head = document.createElement('button');
+            head.type = 'button';
+            head.className = 'gd-dl-row gd-dl-head';
+            head.setAttribute('aria-expanded', open ? 'true' : 'false');
+            head.title = open ? DL_TEXT.collapse : DL_TEXT.expand;
             const cover = document.createElement('img');
             cover.className = 'gd-missing-icon';
             cover.alt = '';
-            if (row.title_id) cover.dataset.dlTitle = row.title_id;
+            if (game.title_id) cover.dataset.dlTitle = game.title_id;
             const text = document.createElement('div');
             text.className = 'gd-dl-text';
             const name = document.createElement('div');
             name.className = 'gd-missing-name';
-            name.textContent = row.title_name || row.filename;
-            name.title = row.filename;
+            name.textContent = game.name;
             const line = document.createElement('div');
             line.className = 'gd-missing-line';
-            line.textContent = [dlWhat(row), row.client === 'Browser' ? DL_TEXT.browser : row.client,
-                row.console ? `${DL_TEXT.console} ${row.console}` : '', dlSize(row.size)].filter(Boolean).join(' · ');
+            line.textContent = [base ? DL_TEXT.game : '', updates ? `${DL_TEXT.updates} ${updates}` : '',
+                dlcs ? `${DL_TEXT.dlcs} ${dlcs}` : '', dlSize(size)].filter(Boolean).join(' · ');
             text.append(name, line);
             const side = document.createElement('div');
             side.className = 'gd-dl-side';
             const who = document.createElement('strong');
-            who.textContent = row.user || DL_TEXT.noUser;
+            who.textContent = users.length === 1 ? users[0] : `${DL_TEXT.users} ${users.length}`;
             const when = document.createElement('span');
-            when.textContent = dlDate(row.at);
+            when.textContent = dlDate(rows[0].at);
             side.append(who, when);
-            item.append(cover, text, side);
-            list.append(item);
+            const chevron = document.createElement('span');
+            chevron.className = 'gd-dl-chevron';
+            chevron.innerHTML = '<i class="bi bi-chevron-down" aria-hidden="true"></i>';
+            head.append(cover, text, side, chevron);
+            head.addEventListener('click', () => {
+                if (dlOpen.has(game.key)) dlOpen.delete(game.key); else dlOpen.add(game.key);
+                const nowOpen = dlOpen.has(game.key);
+                box.classList.toggle('open', nowOpen);
+                head.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+                head.title = nowOpen ? DL_TEXT.collapse : DL_TEXT.expand;
+            });
+
+            const items = document.createElement('div');
+            items.className = 'gd-dl-items';
+            rows.forEach(row => {
+                const item = document.createElement('div');
+                item.className = 'gd-dl-item';
+                const what = document.createElement('div');
+                what.className = 'gd-dl-text';
+                const label = document.createElement('div');
+                label.className = 'gd-dl-what';
+                label.textContent = dlWhat(row) || row.filename;
+                label.title = row.filename;
+                const meta = document.createElement('div');
+                meta.className = 'gd-missing-line';
+                meta.textContent = [row.client === 'Browser' ? DL_TEXT.browser : row.client,
+                    row.console ? `${DL_TEXT.console} ${row.console}` : '', dlSize(row.size)].filter(Boolean).join(' · ');
+                what.append(label, meta);
+                const itemSide = document.createElement('div');
+                itemSide.className = 'gd-dl-side';
+                const itemWho = document.createElement('strong');
+                itemWho.textContent = row.user || DL_TEXT.noUser;
+                const itemWhen = document.createElement('span');
+                itemWhen.textContent = dlDate(row.at);
+                itemSide.append(itemWho, itemWhen);
+                item.append(what, itemSide);
+                items.append(item);
+            });
+            box.append(head, items);
+            list.append(box);
         });
         const empty = document.getElementById('downloadEmpty');
         empty.textContent = total ? DL_TEXT.noMatch : DL_TEXT.empty;
