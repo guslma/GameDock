@@ -116,10 +116,24 @@ def remove_obsolete_keys(target, defaults, path=''):
                 removed = True
     return removed
 
+def normalize_host(value):
+    """GameDock: the bare host name the shop is reached at. Clients compare it with the
+    Host header, so "https://shop.example.com/" has to become "shop.example.com"."""
+    host = str(value or '').strip()
+    host = host.split('://')[-1]
+    return host.split('/')[0].strip()
+
+
 def migrate_shop_settings(settings):
     """Migrate old shop settings format to new client-based structure."""
     migrated = False
     shop = settings.get('shop', {})
+
+    # GameDock: a host saved with a scheme or a trailing slash never matches the Host
+    # header, and every remote client got "Incorrect URL referrer" instead of the shop
+    if shop.get('host') and normalize_host(shop['host']) != shop['host']:
+        shop['host'] = normalize_host(shop['host'])
+        migrated = True
     
     # Check if we have old format (client settings at shop level)
     old_client_keys = ['encrypt', 'hauth', 'clientCertKey', 'clientCertPub']
@@ -330,8 +344,8 @@ def set_local_media_settings(data):
 def set_shop_settings(data):
     with settings_transaction() as settings:
         # Clean host URL if present
-        if 'host' in data and '://' in data['host']:
-            data['host'] = data['host'].split('://')[-1]
+        if 'host' in data:
+            data['host'] = normalize_host(data['host'])
         # Update shop-level settings
         for key in ['name', 'host', 'motd', 'public']:
             if key in data:
