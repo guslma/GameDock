@@ -30,7 +30,7 @@ Funciona em qualquer máquina Linux com Docker, como um mini PC, um NAS ou um Ra
 
 ```bash
 sudo docker run -d --name gamedock \
-  -p 8465:8465 \
+  --network host \
   -e USER_ADMIN_NAME=admin \
   -e USER_ADMIN_PASSWORD=troque-esta-senha \
   -e TZ=America/Sao_Paulo \
@@ -45,7 +45,8 @@ Depois, abra `http://IP-DA-MÁQUINA:8465` no navegador. A imagem funciona em com
 
 - `TZ` é o fuso horário, usado nos registros (**Admin → Configurações → Logs**) e nos agendamentos. Sem ele, o GameDock usa UTC. Em vez de escrever o fuso, dá para usar o da própria máquina com `-v /etc/localtime:/etc/localtime:ro`.
 - O usuário de `USER_ADMIN_NAME` e `USER_ADMIN_PASSWORD` é recriado a cada início do contêiner. Para mudar a senha dele, mude a variável. Os outros usuários são criados e editados em **Admin → Configurações → Usuários**.
-- Para o console achar o servidor sozinho na rede (opção **Encontrar na rede de casa**), o contêiner precisa da rede do host: `--network host` no lugar de `-p 8465:8465`, ou `network_mode: host` no Compose. Sem isso, basta digitar o endereço no console.
+- A rede do host (`--network host`) faz o console achar o servidor sozinho (opção **Encontrar na rede de casa**) e deixa o GameDock ver o IP de verdade de cada console. Com ela, a porta é sempre a 8465.
+- Onde a rede do host não funciona (Docker Desktop no Mac ou no Windows, por exemplo), troque `--network host` por `-p 8465:8465`, ou `network_mode: host` por `ports: ["8465:8465"]` no Compose. Tudo funciona igual, só que no console você digita o endereço em vez de procurar na rede.
 
 Com Docker Compose:
 
@@ -54,8 +55,8 @@ services:
   gamedock:
     image: ghcr.io/guslma/gamedock:latest
     container_name: gamedock
-    ports:
-      - 8465:8465
+    # Rede do host: o console acha o servidor sozinho na rede de casa (porta 8465)
+    network_mode: host
     environment:
       USER_ADMIN_NAME: admin
       USER_ADMIN_PASSWORD: troque-esta-senha
