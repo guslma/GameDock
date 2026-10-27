@@ -803,6 +803,72 @@ p.game-description {
     color: var(--bs-tertiary-color);
 }
 
+/* A game's updates and DLC, open under its row: indented under its art, on a rail. */
+.files-fold {
+    flex: none;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    border: 0;
+    border-radius: 999px;
+    padding: .25rem .65rem;
+    background: var(--files-surface);
+    color: var(--files-secondary);
+    font-size: .75rem;
+    white-space: nowrap;
+}
+
+.files-fold:hover {
+    color: var(--bs-body-color);
+}
+
+.files-fold i {
+    transition: transform .15s ease;
+}
+
+.files-fold.open i {
+    transform: rotate(180deg);
+}
+
+/* On a phone the title needs the width: the fold shows only how many files it holds. */
+.files-fold-short {
+    display: none;
+}
+
+@media (max-width: 575.98px) {
+    .files-fold {
+        gap: .3rem;
+        padding: .25rem .5rem;
+    }
+
+    .files-fold-full {
+        display: none;
+    }
+
+    .files-fold-short {
+        display: inline;
+    }
+}
+
+.files-table tbody tr.files-child > td {
+    padding-top: .3rem;
+    padding-bottom: .3rem;
+}
+
+.files-child .files-row {
+    margin-left: 1.95rem;
+    padding-left: 2.05rem;
+    border-left: 2px solid var(--bs-border-color);
+}
+
+@media (max-width: 575.98px) {
+    .files-child .files-row {
+        margin-left: 1.45rem;
+        padding-left: 1.55rem;
+    }
+}
+
 .files-avatar {
     flex: none;
     width: 4rem;

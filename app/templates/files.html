@@ -811,16 +811,24 @@
         })));
     }
 
-    /** Title, then what the file carries, then the file name - or what the view is about. */
-    function fileRow(r, tab) {
+    /** A DLC's own name, from its file name: its title is the game's. */
+    function dlcName(r) {
+        return r.filename.replace(/\s*\[[0-9A-Fa-f]{16}\].*$/, '').replace(/\.[^.]+$/, '') || contentText(r);
+    }
+
+    /** Title, then what the file carries, then the file name - or what the view is about.
+     *  Under its game (`child`) the title goes without saying: an update shows what it is,
+     *  a DLC its own name. */
+    function fileRow(r, tab, child) {
         const titled = r.apps && r.apps.length;
         const sub = tab.detail ? tab.detail(r) : titled ? r.filename : null;
+        const dlc = child && !r.multicontent && r.apps[0].appType === 'DLC';
         const line = (className, text) => text ? el('div', {className: className, textContent: text, title: text}) : null;
-        const tr = el('tr', {className: r.id === drawerId ? 'files-selected' : ''},
-            el('td', null, el('div', {className: 'files-row'}, avatar(r.apps),
+        const tr = el('tr', {className: [r.id === drawerId ? 'files-selected' : '', child ? 'files-child' : ''].join(' ').trim()},
+            el('td', null, el('div', {className: 'files-row'}, child ? null : avatar(r.apps),
                 el('div', {className: 'files-row-lines'},
-                    line('files-row-title', titled ? titleName(r) : r.filename),
-                    line('files-row-content', contentText(r)),
+                    line('files-row-title', child ? (dlc ? dlcName(r) : contentText(r)) : titled ? titleName(r) : r.filename),
+                    line('files-row-content', child && !dlc ? null : contentText(r)),
                     line('files-row-sub', sub)))),
             el('td', {className: 'files-wide'}, stateIcons(r)),
             el('td', {className: 'text-end files-num'}, formatBytes(r.size)),
@@ -829,6 +837,69 @@
         tr.dataset.id = r.id;
         tr.addEventListener('click', () => openDrawer(r));
         return tr;
+    }
+
+    // A game's files fold under one row, as in the Overview's downloads: the base (or the
+    // bundle holding it) leads, its updates and DLC open under a chevron.
+    const FOLD_TEXT = {updates: 'Updates:', dlc: 'DLC:', expand: 'Show updates and DLC', collapse: 'Hide updates and DLC'};
+    const flipped = new Set();  // title ids opened, or closed when the view starts them open
+
+    /** Only a view ordered by title folds: ordered by size or date, a game's files are not
+     *  neighbours. */
+    function folding(tab) {
+        return tab.kind === 'files' && tab.order && tab.order.field === 'TITLE';
+    }
+
+    const hasType = (r, type) => (r.apps || []).some(a => a.appType === type);
+
+    /** The rows by game, in the order they came: base first, then updates, then DLC. */
+    function games(rows) {
+        const byTitle = new Map();
+        rows.forEach(r => {
+            const titles = fileTitles(r);
+            const key = titles.length ? titles[0].titleId : `file:${r.id}`;
+            if (!byTitle.has(key)) byTitle.set(key, []);
+            byTitle.get(key).push(r);
+        });
+        const rank = r => !(r.apps || []).length || hasType(r, 'BASE') ? 0 : hasType(r, 'UPDATE') ? 1 : 2;
+        return [...byTitle].map(([key, files]) => {
+            files.sort((a, b) => rank(a) - rank(b));
+            const lead = rank(files[0]) === 0 ? files[0] : null;
+            return {key, files, lead, items: lead ? files.slice(1) : files};
+        });
+    }
+
+    /** A game's head row with its chevron, then, open, its updates and DLC. With a search or
+     *  a filter on, games start open: what matched may be an update or a DLC. */
+    function gameRows(game, tab) {
+        if (game.files.length === 1) return [fileRow(game.files[0], tab)];
+        const filtered = Object.keys(tab.filters).length > 0 || Boolean(tab.search);
+        const open = flipped.has(game.key) !== filtered;
+        const updates = game.items.filter(r => hasType(r, 'UPDATE')).length;
+        const dlcs = game.items.filter(r => hasType(r, 'DLC')).length;
+        const fold = el('button', {type: 'button', className: 'files-fold' + (open ? ' open' : ''),
+                                   title: open ? FOLD_TEXT.collapse : FOLD_TEXT.expand},
+            el('span', {className: 'files-fold-full', textContent: [updates ? `${FOLD_TEXT.updates} ${updates}` : '',
+                                                                    dlcs ? `${FOLD_TEXT.dlc} ${dlcs}` : ''].filter(Boolean).join(' · ')}),
+            el('span', {className: 'files-fold-short', textContent: `+${game.items.length}`}),
+            el('i', {className: 'bi bi-chevron-down'}));
+        fold.setAttribute('aria-expanded', String(open));
+        fold.addEventListener('click', e => {
+            e.stopPropagation();
+            if (flipped.has(game.key)) flipped.delete(game.key); else flipped.add(game.key);
+            renderBody();
+        });
+        // No base among the rows: a head of the game alone, which only folds.
+        const head = game.lead ? fileRow(game.lead, tab) : el('tr', null,
+            el('td', null, el('div', {className: 'files-row'}, avatar(game.items[0].apps),
+                el('div', {className: 'files-row-lines'},
+                    el('div', {className: 'files-row-title', textContent: titleName(game.items[0])})))),
+            el('td', {className: 'files-wide'}),
+            el('td', {className: 'text-end files-num'}, formatBytes(game.items.reduce((sum, r) => sum + (r.size || 0), 0))),
+            el('td', {className: 'files-wide'}), el('td'));
+        if (!game.lead) head.addEventListener('click', () => fold.click());
+        head.querySelector('.files-row').append(fold);
+        return [head, ...(open ? game.items.map(r => fileRow(r, tab, true)) : [])];
     }
 
     function message(text) {
@@ -853,7 +924,8 @@
             document.getElementById('filesGroups').replaceChildren();
             const rows = visibleRows();
             document.querySelector('#filesTable tbody').replaceChildren(
-                ...(tab.rows === null ? [message('Loading…')] : rows.length ? rows.map(r => fileRow(r, tab)) : [message(empty)]));
+                ...(tab.rows === null ? [message('Loading…')] : !rows.length ? [message(empty)]
+                    : folding(tab) ? games(rows).flatMap(g => gameRows(g, tab)) : rows.map(r => fileRow(r, tab))));
         }
         paintBusy();
         renderPager();
